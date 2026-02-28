@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>しまねこスケジューラー Pro</title>
+
+    <!-- Google Fonts: Zen Maru Gothic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Tesseract.js -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+
+    <style>
+        :root {
+            --color-bg: #FFFAF0;
+            /* フローラルホワイト */
+            --color-text: #8D6E63;
+            /* ブラウン */
+            --color-accent: #F4A460;
+            /* オレンジ */
+            --color-accent-hover: #E09050;
+            --color-white: #FFFFFF;
+            --color-border: #D7CCC8;
+            --radius-main: 16px;
+            --radius-sm: 8px;
+            --shadow-card: 0 4px 12px rgba(141, 110, 99, 0.08);
+
+            /* Default Member Colors */
+            --col-sasami: #F48FB1;
+            --col-kombu: #A5D6A7;
+            --col-tsuna: #90CAF9;
+            --col-task: #FF7043;
+            /* Task Red */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-weight: 700;
+            color: var(--color-text);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Card Style */
+        .card {
+            background: var(--color-white);
+            border-radius: var(--radius-main);
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--color-bg);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            background-color: var(--color-text);
+            color: var(--color-white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn:hover {
+            background-color: var(--color-accent);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 2px solid var(--color-text);
+            color: var(--color-text);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            border-color: var(--color-accent);
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            width: auto;
+        }
+
+        /* Forms */
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        input[type="text"],
+        textarea,
+        input[type="date"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--color-border);
+            background-color: var(--color-bg);
+            font-family: inherit;
+            font-size: 1rem;
+            color: var(--color-text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        input[type="date"]:focus {
+            border-color: var(--color-accent);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--color-border);
+            border-radius: var(--radius-main);
+            padding: 24px;
+            text-align: center;
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            background-color: #FFF3E0;
+            border-color: var(--color-accent);
+        }
+
+        /* Member Config Items */
+        .member-setting-item {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--color-bg);
+        }
+
+        .member-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }
+
+        /* Preview Table */
+        .preview-list {
+            list-style: none;
+            margin-top: 16px;
+        }
+
+        .preview-item {
+            background: var(--color-bg);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            display: grid;
+            grid-template-columns: 80px 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .preview-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .preview-member {
+            font-size: 0.8rem;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .preview-delete {
+            color: #d32f2f;
+            cursor: pointer;
+            font-size: 1.2rem;
+            background: none;
+            border: none;
+            padding: 8px;
+        }
+
+        /* Calendar View */
+        .calendar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .date-row {
+            background: var(--color-white);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            gap: 12px;
+        }
+
+        .date-header {
+            text-align: center;
+            border-right: 2px solid var(--color-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .date-num {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .date-day {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .shift-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .shift-bar {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .task-bar {
+            border-left: 4px solid var(--col-task);
+            background: #FFEBEE;
+            color: #D84315;
+            font-weight: bold;
+        }
+
+        .shift-name {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .shift-time {
+            font-size: 0.75rem;
+        }
+
+        /* Matching View */
+        .matching-item {
+            background: #E8F5E9;
+            border: 1px solid #C8E6C9;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            color: #2E7D32;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 250, 240, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .tab-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 20px;
+            border: none;
+            background: #EEE;
+            cursor: pointer;
+            font-weight: bold;
+            color: #888;
+        }
+
+        .tab-btn.active {
+            background: var(--color-accent);
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1 style="cursor: pointer;" onclick="showHome()">🐈 しまねこ予定表 Pro</h1>
+        </header>
+
+        <!-- Home/Calendar Section -->
+        <section id="home-section">
+            <div class="card" style="padding: 16px;">
+                <div class="tab-group">
+                    <button class="tab-btn active" id="tab-calendar" onclick="switchTab('calendar')">📅 カレンダー</button>
+                    <button class="tab-btn" id="tab-matching" onclick="switchTab('matching')">🤝 マッチング</button>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm" onclick="toggleSection('import')">+ インポート</button>
+                        <button class="btn btn-sm btn-secondary" onclick="toggleSection('settings')">⚙️ 設定</button>
+                    </div>
+                    <button class="btn btn-sm btn-secondary" onclick="clearData()">クリア</button>
+                </div>
+            </div>
+
+            <div id="calendar-view">
+                <div id="calendar-container" class="calendar-list"></div>
+            </div>
+
+            <div id="matching-view" class="hidden">
+                <div class="card">
+                    <h3>🐈 ミーティング推奨日時</h3>
+                    <p style="font-size:0.9rem; color:#666; margin-bottom:12px;">全員が「休み」ではなく、シフトが入っている共通の時間帯です。</p>
+                    <div id="matching-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2>メンバー設定</h2>
+                <button class="btn btn-sm btn-secondary" onclick="saveSettings()">保存して閉じる</button>
+            </div>
+
+            <p style="font-size:0.9rem; margin-bottom:16px;">
+                シフト表に書かれている名前（キーワード）を設定してください。<br>
+                ※カンマ区切りで複数指定できます。
+            </p>
+
+            <div id="settings-list"></div>
+        </section>
+
+        <!-- Import Section -->
+        <section id="import-section" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2>インポート</h2>
+                <button class="btn btn-sm btn-secondary" onclick="showHome()">閉じる</button>
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+                <p>📷 画像をここにドロップ<br>(またはクリックして選択)<br><span
+                        style="font-size: 0.8rem; color: #aaa;">OCRでテキストを読み取ります</span></p>
+                <input type="file" id="file-input" accept="image/*" style="display: none;">
+            </div>
+
+            <p style="margin-bottom: 8px; font-size: 0.9rem;">テキスト (シフト表 または Notionタスク)</p>
+            <textarea id="raw-text-input" placeholder="例: 2/20 田中 10-19&#10;例: 2/25 LPデザイン提出"></textarea>
+            <button id="btn-analyze" class="btn">解析してプレビュー</button>
+        </section>
+
+        <!-- Preview Section -->
+        <section id="preview-section" class="card hidden">
+            <h2>解析結果の確認</h2>
+            <p style="margin-bottom: 16px; font-size: 0.9rem;">
+                読み取りミスがあれば日付や内容を修正してください。
+            </p>
+
+            <div id="preview-list" class="preview-list"></div>
+
+            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <button id="btn-cancel" class="btn btn-secondary" onclick="toggleSection('import')">やり直し</button>
+                <button id="btn-save" class="btn" onclick="saveData()">これで保存</button>
+            </div>
+        </section>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div style="font-size: 2rem;">🐈</div>
+            <p id="loading-text" style="font-weight: bold; margin-top: 16px;">読み込み中...</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Global Error Handler
+        window.onerror = function (msg, url, line) {
+            alert("エラーが発生しました: " + msg + "\\n行: " + line);
+            return false;
+        };
+
+        // Config & Data
+        const DEFAULT_MEMBERS = [
+            { id: "sasami", name: "ササミ", color: "#F48FB1", keywords: "ササミ,佐々木,Sasaki" },
+            { id: "kombu", name: "コンブ", color: "#A5D6A7", keywords: "コンブ,昆布,ボブ,田中" },
+            { id: "tsuna", name: "ツナ", color: "#90CAF9", keywords: "ツナ,綱,Tsuna,佐藤" }
+        ];
+
+        const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v3";
+        const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
+
+        let memberConfig = [];
+        let appData = { shifts: [] };
+        let tempParsedData = [];
+
+        // Valid DOM Elements check
+        const elHomeSection = document.getElementById('home-section');
+        const elSettingsSection = document.getElementById('settings-section');
+        const elImportSection = document.getElementById('import-section');
+        const elPreviewSection = document.getElementById('preview-section');
+
+        // View DOMs
+        const elCalendarView = document.getElementById('calendar-view');
+        const elMatchingView = document.getElementById('matching-view');
+        const elCalendarContainer = document.getElementById('calendar-container');
+        const elMatchingList = document.getElementById('matching-list');
+
+        const elInput = document.getElementById('raw-text-input');
+        const elPreviewList = document.getElementById('preview-list');
+
+        const elLoading = document.getElementById('loading-overlay');
+        const elLoadingText = document.getElementById('loading-text');
+        const elDropZone = document.getElementById('drop-zone');
+        const elFileInput = document.getElementById('file-input');
+
+        // Init
+        loadConfig();
+        loadData();
+        renderCalendar();
+        renderMatching();
+
+        // Events
+        document.getElementById('btn-analyze').addEventListener('click', analyzeText);
+
+        elDropZone.addEventListener('click', () => elFileInput.click());
+
+        elDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elDropZone.classList.add('dragover');
+        });
+
+        elDropZone.addEventListener('dragleave', () => {
+            elDropZone.classList.remove('dragover');
+        });
+
+        elDropZone.addEventListener('drop', handleImageDrop);
+        elFileInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
+
+        // Navigation & Tabs
+        function toggleSection(mode) {
+            elHomeSection.classList.add('hidden');
+            elSettingsSection.classList.add('hidden');
+            elImportSection.classList.add('hidden');
+            elPreviewSection.classList.add('hidden');
+            elLoading.classList.add('hidden');
+
+            if (mode === 'home') {
+                elHomeSection.classList.remove('hidden');
+                renderCalendar();
+                renderMatching();
+            } else if (mode === 'settings') {
+                renderSettings();
+                elSettingsSection.classList.remove('hidden');
+            } else if (mode === 'import') {
+                elImportSection.classList.remove('hidden');
+            } else if (mode === 'preview') {
+                elPreviewSection.classList.remove('hidden');
+            }
+        }
+
+        window.switchTab = (tab) => {
+            document.getElementById('tab-calendar').classList.remove('active');
+            document.getElementById('tab-matching').classList.remove('active');
+
+            elCalendarView.classList.add('hidden');
+            elMatchingView.classList.add('hidden');
+
+            if (tab === 'calendar') {
+                document.getElementById('tab-calendar').classList.id = 'active'; // Class handling fix
+                document.getElementById('tab-calendar').classList.add('active');
+                elCalendarView.classList.remove('hidden');
+            } else {
+                document.getElementById('tab-matching').classList.add('active');
+                elMatchingView.classList.remove('hidden');
+                renderMatching();
+            }
+        };
+
+        window.toggleSection = toggleSection;
+        window.showHome = () => toggleSection('home');
+        window.clearData = clearData;
+        window.saveSettings = saveSettings;
+        window.saveData = saveData;
+
+        // --- Settings Logic ---
+        function loadConfig() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
+                if (raw) {
+                    memberConfig = JSON.parse(raw);
+                    // Remove mito from existing local storage config
+                    memberConfig = memberConfig.filter(m => m.id !== "mito");
+                } else {
+                    memberConfig = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+                }
+            } catch (e) {
+                console.error("Config load error", e);
+                memberConfig = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+            }
+        }
+
+        function renderSettings() {
+            const list = document.getElementById('settings-list');
+            list.innerHTML = '';
+            memberConfig.forEach((m, idx) => {
+                const div = document.createElement('div');
+                div.className = 'member-setting-item';
+                div.innerHTML = `
+                <div class="member-header">
+                    <span class="color-dot" style="background:${m.color}"></span>
+                    <span>${m.name}</span>
+                </div>
+                <label style="font-size:0.8rem;">検索キーワード (カンマ区切り)</label>
+                <input type="text" id="setting-keywords-${idx}" value="${m.keywords}">
+            `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveSettings() {
+            memberConfig.forEach((m, idx) => {
+                const el = document.getElementById(`setting-keywords-${idx}`);
+                if (el) m.keywords = el.value;
+            });
+            localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(memberConfig));
+            alert("設定を保存しました。");
+            toggleSection('home');
+        }
+
+        // --- OCR Logic ---
+        async function handleImageDrop(e) {
+            e.preventDefault();
+            elDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleImageFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        async function handleImageFile(file) {
+            if (!file) return;
+
+            elLoading.classList.remove('hidden');
+            elLoadingText.innerText = "画像を解析中...\\n(これには少し時間がかかります)";
+
+            try {
+                const worker = await Tesseract.createWorker('jpn');
+                const ret = await worker.recognize(file);
+
+                const currentVal = elInput.value;
+                elInput.value = (currentVal ? currentVal + "\\n\\n" : "") + ret.data.text;
+
+                await worker.terminate();
+                elLoading.classList.add('hidden');
+            } catch (err) {
+                console.error(err);
+                alert("画像解析に失敗しました: " + err);
+                elLoading.classList.add('hidden');
+            }
+        }
+
+        // --- Parsing Logic (Shift + Task) ---
+        function analyzeText() {
+            const text = elInput.value.trim();
+            if (!text) {
+                alert("テキストを入力してください");
+                return;
+            }
+
+            const lines = text.split(/\r?\n/);
+            tempParsedData = [];
+            let currentDate = null;
+
+            const dateRegex = /(\d{1,2})\s*[\/\月]\s*(\d{1,2})/;
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                // Date Detection
+                const dateMatch = trimmed.match(dateRegex);
+                let lineDate = null;
+                if (dateMatch) {
+                    lineDate = `${dateMatch[1]}/${dateMatch[2]}`;
+                    currentDate = lineDate;
+                }
+
+                // A) Check for Shift (Member Keywords)
+                let isShift = false;
+                memberConfig.forEach(memberData => {
+                    const keywords = memberData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                    const matchedKeyword = keywords.find(k => trimmed.includes(k));
+
+                    if (matchedKeyword) {
+                        isShift = true;
+                        let content = trimmed
+                            .replace(matchedKeyword, "")
+                            .replace(dateRegex, "")
+                            .trim();
+                        content = content.replace(/^[:：,、\s]+|[:：,、\s]+$/g, '');
+
+                        if (content.match(/休|OFF|off/)) content = "休み";
+
+                        tempParsedData.push({
+                            id: Date.now() + Math.random(),
+                            date: currentDate || "2/1", // fallback
+                            member: memberData.name,
+                            memberColor: memberData.color,
+                            type: 'shift',
+                            content: content || "要確認"
+                        });
+                    }
+                });
+
+                // B) Check for Task (If not shift, but has date)
+                if (!isShift && lineDate) {
+                    // Assume it's a task/deadline
+                    let taskName = trimmed.replace(dateRegex, "").trim();
+                    taskName = taskName.replace(/^[:：,、\s]+|[:：,、\s]+$/g, '');
+                    if (taskName) {
+                        tempParsedData.push({
+                            id: Date.now() + Math.random(),
+                            date: lineDate,
+                            member: "全員/〆",
+                            memberColor: "#FF7043", // Task color
+                            type: 'task',
+                            content: "〆 " + taskName
+                        });
+                    }
+                }
+            });
+
+            if (tempParsedData.length === 0) {
+                // Fallback for user entering manual row
+                tempParsedData.push({
+                    id: Date.now(),
+                    date: "2/1",
+                    member: "ササミ",
+                    memberColor: "#F48FB1",
+                    type: 'shift',
+                    content: ""
+                });
+                alert("データを認識できませんでした。手入力用の行を追加しました。");
+            }
+
+            renderPreview();
+            toggleSection('preview');
+        }
+
+        function renderPreview() {
+            elPreviewList.innerHTML = '';
+            tempParsedData.forEach((item, index) => {
+                // Convert M/D to YYYY-MM-DD for input[type=date]
+                const ymd = parseDateToInputFormat(item.date);
+
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `
+                <div class="preview-meta">
+                    <input type="date" style="padding:4px;" value="${ymd}" onchange="window.updateTempDate(${index}, this.value)">
+                    <span class="preview-member" style="background:${item.memberColor};">${item.member}</span>
+                </div>
+                <input type="text" value="${item.content}" onchange="window.updateTempContent(${index}, this.value)">
+                <button class="preview-delete" onclick="window.removeItem(${index})">×</button>
+            `;
+                elPreviewList.appendChild(div);
+            });
+        }
+
+        window.updateTempDate = (index, ymd) => {
+            // ymd is 2026-02-20
+            if (ymd) {
+                const parts = ymd.split('-');
+                tempParsedData[index].date = `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+            }
+        };
+        window.updateTempContent = (index, val) => { tempParsedData[index].content = val; };
+        window.removeItem = (index) => { tempParsedData.splice(index, 1); renderPreview(); };
+
+        // --- Data Management ---
+        function saveData() {
+            const newShifts = tempParsedData.map(t => ({
+                ...t,
+                timestamp: parseDateString(t.date)
+            }));
+
+            appData.shifts = [...appData.shifts, ...newShifts];
+            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+
+            elInput.value = "";
+            toggleSection('home');
+        }
+
+        function loadData() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY_DATA);
+                if (raw) {
+                    appData = JSON.parse(raw);
+                }
+            } catch (e) {
+                console.error("Data load error", e);
+                appData = { shifts: [] };
+            }
+        }
+
+        function clearData() {
+            if (confirm("全てのデータを削除しますか？")) {
+                localStorage.removeItem(STORAGE_KEY_DATA);
+                appData = { shifts: [] };
+                renderCalendar();
+                renderMatching();
+            }
+        }
+
+        // Helper: "2/20" -> "2026-02-20"
+        function parseDateToInputFormat(str) {
+            if (!str) return "2026-02-01";
+            const parts = str.split(/[\/\月]/);
+            if (parts.length < 2) return "2026-02-01";
+            const m = parts[0].padStart(2, '0');
+            const d = parts[1].padStart(2, '0');
+            return `2026-${m}-${d}`;
+        }
+
+        function parseDateString(str) {
+            if (!str) return Date.now();
+            const parts = str.split(/[\/\月]/);
+            if (parts.length < 2) return Date.now();
+            const m = parseInt(parts[0]);
+            const d = parseInt(parts[1]);
+            return new Date(2026, m - 1, d).getTime();
+        }
+
+        // --- Calendar Rendering ---
+        function renderCalendar() {
+            elCalendarContainer.innerHTML = '';
+
+            if (!appData.shifts || appData.shifts.length === 0) {
+                elCalendarContainer.innerHTML = `<div style="text-align: center; padding: 40px; color: #aaa;">予定がありません。<br>「+ インポート」から追加してください。</div>`;
+                return;
+            }
+
+            const grouped = {};
+            appData.shifts.forEach(s => {
+                if (!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            let html = "";
+            Object.keys(grouped).forEach(dateStr => {
+                const shifts = grouped[dateStr];
+                const dateParts = dateStr.split(/[\/\月]/);
+
+                let barsHtml = "";
+                shifts.forEach(s => {
+                    if (s.type === 'task') {
+                        barsHtml += `
+                        <div class="shift-bar task-bar">
+                            <span class="shift-name">${s.content}</span>
+                        </div>
+                    `;
+                    } else {
+                        const mConf = memberConfig.find(m => m.name === s.member);
+                        const color = mConf ? mConf.color : "#eee";
+                        barsHtml += `
+                        <div class="shift-bar" style="background-color: ${color};">
+                            <span class="shift-name">${s.member}</span>
+                            <span class="shift-time">${s.content}</span>
+                        </div>
+                    `;
+                    }
+                });
+
+                html += `
+                <div class="date-row">
+                    <div class="date-header">
+                        <div class="date-num">${dateParts[1] || dateParts[0]}</div>
+                        <div class="date-day">/ ${dateParts[0]}</div> 
+                    </div>
+                    <div class="shift-bars">
+                        ${barsHtml}
+                    </div>
+                </div>
+            `;
+            });
+
+            elCalendarContainer.innerHTML = html;
+        }
+
+        // --- Matching Logic ---
+        function renderMatching() {
+            elMatchingList.innerHTML = '';
+            if (!appData.shifts || appData.shifts.length === 0) {
+                elMatchingList.innerHTML = `<p style="text-align:center; color:#aaa;">データがありません</p>`;
+                return;
+            }
+
+            const grouped = {};
+            appData.shifts.forEach(s => {
+                if (s.type === 'shift' && !s.content.includes('休')) {
+                    if (!grouped[s.date]) grouped[s.date] = new Set();
+                    grouped[s.date].add(s.member);
+                }
+            });
+
+            // Current required members count = 4 (assuming all must work?)
+            // Let's filter days where ALL 4 members are working
+            const targetCount = memberConfig.length;
+
+            let found = false;
+            Object.keys(grouped).forEach(dateStr => {
+                const workingMembers = grouped[dateStr];
+                if (workingMembers.size >= targetCount) {
+                    // Assuming overlap: 13:00-16:00 (Placeholder logic)
+                    const div = document.createElement('div');
+                    div.className = 'matching-item';
+                    div.innerHTML = `
+                    <span>${dateStr}</span>
+                    <span>🕒 ミーティングOK</span>
+                `;
+                    elMatchingList.appendChild(div);
+                    found = true;
+                }
+            });
+
+            if (!found) {
+                elMatchingList.innerHTML = `<p style="text-align:center; color:#aaa;">全員が揃う日は今のところありません...</p>`;
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
