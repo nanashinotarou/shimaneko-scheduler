@@ -653,6 +653,27 @@
 
             const dateRegex = /(\d{1,2})\s*[\/\月]\s*(\d{1,2})/;
 
+            // 【機能追加】テキストの上部からヘッダー（列の並び順）を特定する
+            let detectedHeaders = [];
+            for (let i = 0; i < Math.min(lines.length, 10); i++) {
+                let foundMembers = [];
+                memberConfig.forEach(memberData => {
+                    const keywords = memberData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                    const matchedKeyword = keywords.find(k => lines[i].includes(k));
+                    if (matchedKeyword) {
+                        foundMembers.push({ member: memberData, pos: lines[i].indexOf(matchedKeyword) });
+                    }
+                });
+                if (foundMembers.length > 0) {
+                    foundMembers.sort((a, b) => a.pos - b.pos);
+                    detectedHeaders = foundMembers.map(f => f.member);
+                    break;
+                }
+            }
+
+            // 【機能追加】ノイズ除去用フィルター（シフト時間に頻出するパターンのみ抽出）
+            const shiftPattern = /(休|off|OFF|\d{1,2}[:.～〜\-]?\d{1,2}|\d+h?)/g;
+
             lines.forEach(line => {
                 const trimmed = line.trim();
                 if (!trimmed) return;
@@ -665,7 +686,7 @@
                     currentDate = lineDate;
                 }
 
-                // A) Check for Shift (Member Keywords)
+                // A) リスト形式チェック (名前が直接含まれているか)
                 let isShift = false;
                 memberConfig.forEach(memberData => {
                     const keywords = memberData.keywords.split(',').map(k => k.trim()).filter(k => k);
@@ -692,12 +713,37 @@
                     }
                 });
 
-                // B) Check for Task (If not shift, but has date)
+                // B) 表形式データの推測 (名前がないが日付があり、ヘッダーが特定できている場合)
+                if (!isShift && lineDate && detectedHeaders.length > 0) {
+                    let restText = trimmed.replace(dateRegex, "").trim();
+                    let tokens = restText.match(shiftPattern);
+
+                    if (tokens && tokens.length > 0) {
+                        isShift = true; // トークンが見つかればシフト行と判定
+                        tokens.forEach((token, idx) => {
+                            if (idx < detectedHeaders.length) {
+                                let content = token;
+                                if (content.match(/休|OFF|off/)) content = "休み";
+
+                                tempParsedData.push({
+                                    id: Date.now() + Math.random(),
+                                    date: lineDate,
+                                    member: detectedHeaders[idx].name,
+                                    memberColor: detectedHeaders[idx].color,
+                                    type: 'shift',
+                                    content: content
+                                });
+                            }
+                        });
+                    }
+                }
+
+                // C) タスク判定 (シフトではなく日付があるテキスト)
                 if (!isShift && lineDate) {
-                    // Assume it's a task/deadline
                     let taskName = trimmed.replace(dateRegex, "").trim();
                     taskName = taskName.replace(/^[:：,、\s]+|[:：,、\s]+$/g, '');
-                    if (taskName) {
+                    // ゴミ文字だけの行は除外
+                    if (taskName && taskName.replace(/[^\w\sぁ-んァ-ヶ亜-熙]/g, '').length > 0) {
                         tempParsedData.push({
                             id: Date.now() + Math.random(),
                             date: lineDate,
