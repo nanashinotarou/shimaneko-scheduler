@@ -67,9 +67,18 @@ function doPost(e) {
     const existingData = sheet.getDataRange().getValues();
     let existingKeys = new Set();
     if (existingData.length > 1) {
+      const headers = existingData[0];
+      const dkIdx = headers.indexOf('dateKey');
+      const mbIdx = headers.indexOf('member');
+      const ctIdx = headers.indexOf('content');
+      const tpIdx = headers.indexOf('type');
+
       existingData.slice(1).forEach(row => {
-        // [dateKey]-[member]-[content]-[type] などを一意キーとする
-        const key = `${row[2]}-${row[3]}-${row[4]}-${row[5]}`;
+        let dk = row[dkIdx];
+        if (dk instanceof Date) {
+          dk = `${dk.getFullYear()}/${dk.getMonth() + 1}/${dk.getDate()}`;
+        }
+        const key = `${dk}-${row[mbIdx]}-${row[ctIdx]}-${row[tpIdx]}`;
         existingKeys.add(key);
       });
     }
