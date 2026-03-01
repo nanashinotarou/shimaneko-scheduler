@@ -239,7 +239,145 @@
             padding: 8px;
         }
 
-        /* Calendar View */
+        /* Calendar View (Grid) */
+        .calendar-header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            border: 2px solid var(--color-border);
+            background: var(--color-white);
+            color: var(--color-text);
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .filter-btn.active {
+            background: var(--color-text);
+            color: white;
+            border-color: var(--color-text);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .weekday-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: #888;
+            padding: 8px 0;
+        }
+
+        .weekday-header.sun {
+            color: #d32f2f;
+        }
+
+        .weekday-header.sat {
+            color: #1976d2;
+        }
+
+        .calendar-day {
+            background: var(--color-white);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border);
+            min-height: 100px;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+        }
+
+        /* スマホ用レスポンシブ (カードレイアウトへ移行) */
+        @media (max-width: 600px) {
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .weekday-header {
+                display: none;
+            }
+
+            .calendar-day {
+                min-height: auto;
+                padding: 12px;
+                gap: 8px;
+                flex-direction: row;
+                align-items: flex-start;
+            }
+
+            .calendar-day .date-header {
+                width: 50px;
+                flex-shrink: 0;
+                text-align: center;
+                border-right: 2px solid var(--color-bg);
+                margin-right: 8px;
+            }
+
+            .calendar-day-content {
+                flex: 1;
+            }
+        }
+
+        .calendar-day.offline {
+            background-color: #f5f5f5;
+            opacity: 0.8;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
+        }
+
+        .calendar-day.recommended {
+            border: 2px solid #FFD54F;
+            background-color: #FFFDE7;
+            box-shadow: 0 4px 12px rgba(255, 213, 79, 0.3);
+        }
+
+        .calendar-day.collaboration {
+            border: 2px solid #E1BEE7;
+            background-color: #F3E5F5;
+        }
+
+        .date-header {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #555;
+        }
+
+        .date-header span.badge {
+            font-size: 0.6rem;
+            padding: 2px 4px;
+            border-radius: 4px;
+            margin-left: 4px;
+            background: #FFD54F;
+            color: #424242;
+            vertical-align: top;
+        }
+
+        .calendar-day-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
         .calendar-list {
             display: flex;
             flex-direction: column;
@@ -319,6 +457,107 @@
             align-items: center;
         }
 
+        /* Bot Interaction Modal */
+        .bot-modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--color-bg);
+            border-top: 4px solid var(--col-kombu);
+            padding: 24px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 900;
+            display: flex;
+            flex-direction: column;
+            max-height: 80vh;
+        }
+
+        .bot-modal.active {
+            transform: translateY(0);
+        }
+
+        .bot-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .bot-avatar {
+            font-size: 2.5rem;
+            background: var(--color-white);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .bot-bubble {
+            background: var(--color-white);
+            padding: 16px;
+            border-radius: 0 16px 16px 16px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            font-weight: bold;
+            flex: 1;
+            position: relative;
+        }
+
+        .bot-bubble::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -10px;
+            border-top: 15px solid var(--color-white);
+            border-left: 15px solid transparent;
+        }
+
+        .bot-content {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--color-white);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            border: 1px solid var(--color-border);
+        }
+
+        .bot-date-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .bot-date-btn {
+            background: var(--color-bg);
+            border: 2px solid var(--color-border);
+            padding: 12px 4px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+        }
+
+        .bot-date-btn.selected {
+            background: var(--col-task);
+            color: white;
+            border-color: var(--col-task);
+        }
+
+        .bot-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
         /* Utility */
         .hidden {
             display: none !important;
@@ -366,12 +605,16 @@
             <h1 style="cursor: pointer;" onclick="showHome()">🐈 しまねこ予定表 Pro</h1>
         </header>
 
-        <!-- Home/Calendar Section -->
         <section id="home-section">
             <div class="card" style="padding: 16px;">
-                <div class="tab-group">
-                    <button class="tab-btn active" id="tab-calendar" onclick="switchTab('calendar')">📅 カレンダー</button>
-                    <button class="tab-btn" id="tab-matching" onclick="switchTab('matching')">🤝 マッチング</button>
+                <div class="calendar-header-actions">
+                    <div class="filter-group">
+                        <button class="filter-btn active" onclick="toggleFilter('all')" id="filter-all">全て</button>
+                        <button class="filter-btn" onclick="toggleFilter('sasami')" id="filter-sasami">ササミ</button>
+                        <button class="filter-btn" onclick="toggleFilter('tsuna')" id="filter-tsuna">ツナ</button>
+                        <button class="filter-btn" onclick="toggleFilter('kombu')" id="filter-kombu">コンブ</button>
+                        <button class="filter-btn" onclick="toggleFilter('offline')" id="filter-offline">休業日</button>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -384,14 +627,28 @@
             </div>
 
             <div id="calendar-view">
-                <div id="calendar-container" class="calendar-list"></div>
+                <!-- 曜日見出し -->
+                <div class="calendar-grid" style="margin-bottom: 8px;" id="weekday-header-row">
+                    <div class="weekday-header sun">日</div>
+                    <div class="weekday-header">月</div>
+                    <div class="weekday-header">火</div>
+                    <div class="weekday-header">水</div>
+                    <div class="weekday-header">木</div>
+                    <div class="weekday-header">金</div>
+                    <div class="weekday-header sat">土</div>
+                </div>
+                <div id="calendar-container" class="calendar-grid"></div>
             </div>
 
-            <div id="matching-view" class="hidden">
-                <div class="card">
-                    <h3>🐈 ミーティング推奨日時</h3>
-                    <p style="font-size:0.9rem; color:#666; margin-bottom:12px;">全員が「休み」ではなく、シフトが入っている共通の時間帯です。</p>
-                    <div id="matching-list"></div>
+            <div id="calendar-legend"
+                style="margin-top: 16px; font-size: 0.8rem; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <div><span
+                        style="display:inline-block; width:12px; height:12px; background:#FFFDE7; border: 2px solid #FFD54F;"></span>
+                    稼働おすすめ日</div>
+                <div><span
+                        style="display:inline-block; width:12px; height:12px; background:#F3E5F5; border: 2px solid #E1BEE7;"></span>
+                    3人共通予定あり</div>
+                <div><span style="display:inline-block; width:12px; height:12px; background:#f5f5f5;"></span> しまねこ休業日
                 </div>
             </div>
         </section>
@@ -449,9 +706,30 @@
 
             <div style="margin-top: 24px; display: flex; gap: 12px;">
                 <button id="btn-cancel" class="btn btn-secondary" onclick="toggleSection('import')">やり直し</button>
-                <button id="btn-save" class="btn" onclick="saveData()">これで保存</button>
+                <button id="btn-save" class="btn" onclick="startBotInteraction()">これでOK (次へ)</button>
             </div>
         </section>
+
+        <!-- Bot Interaction Modal -->
+        <div id="bot-modal" class="bot-modal">
+            <div class="bot-header">
+                <div class="bot-avatar">🐈‍⬛</div>
+                <div class="bot-bubble" id="bot-message">
+                    OK！シフトは見込めたよ。<br>じゃあ最後に、今月「しまねこデザイン」を終日お休み(オフ)にしたい日があれば教えてね！チームのスケジュールの参考にするよ。
+                </div>
+            </div>
+            <div class="bot-content">
+                <p style="font-size:0.8rem; color:#666; text-align:center;">（休業日としてマークしたい日を全てタップしてください）</p>
+                <div id="bot-calendar-select" class="bot-date-grid">
+                    <!-- Date buttons generated by JS -->
+                </div>
+            </div>
+            <div class="bot-actions">
+                <button class="btn btn-secondary" onclick="finishBotInteraction(false)">休業日なしで完了</button>
+                <button class="btn" onclick="finishBotInteraction(true)"
+                    style="background:var(--col-kombu); color:var(--color-text);">決定して完了</button>
+            </div>
+        </div>
 
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="loading-overlay hidden">
@@ -475,7 +753,12 @@
             { id: "tsuna", name: "ツナ", color: "#90CAF9", keywords: "ツナ,綱,Tsuna,佐藤" }
         ];
 
-        const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v3";
+        // 研修対象日（自動的にコンブの9-13時が入る日）
+        const TRAINING_DATES = [
+            "2026/03/01", "2026/03/02", "2026/03/03" // 例: 仮の日程（後で変更可能）
+        ];
+
+        const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v4"; // Change key for new data format
         const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
         const STORAGE_KEY_API = "shimaneko_scheduler_gemini_key";
 
@@ -483,6 +766,12 @@
         let geminiApiKey = "";
         let appData = { shifts: [] };
         let tempParsedData = [];
+
+        let activeFilters = {
+            sasami: true, tsuna: true, kombu: true, offline: true
+        };
+        let botSelectedDates = new Set();
+        let currentCalendarMonth = new Date(2026, 1, 1); // 2026年2月デフォルト
 
         // Valid DOM Elements check
         const elHomeSection = document.getElementById('home-section');
@@ -492,9 +781,7 @@
 
         // View DOMs
         const elCalendarView = document.getElementById('calendar-view');
-        const elMatchingView = document.getElementById('matching-view');
         const elCalendarContainer = document.getElementById('calendar-container');
-        const elMatchingList = document.getElementById('matching-list');
 
         const elInput = document.getElementById('raw-text-input');
         const elPreviewList = document.getElementById('preview-list');
@@ -504,11 +791,13 @@
         const elDropZone = document.getElementById('drop-zone');
         const elFileInput = document.getElementById('file-input');
 
+        const elBotModal = document.getElementById('bot-modal');
+        const elBotCalendarSelect = document.getElementById('bot-calendar-select');
+
         // Init
         loadConfig();
         loadData();
         renderCalendar();
-        renderMatching();
 
         // Events
         document.getElementById('btn-analyze').addEventListener('click', analyzeText);
@@ -534,11 +823,11 @@
             elImportSection.classList.add('hidden');
             elPreviewSection.classList.add('hidden');
             elLoading.classList.add('hidden');
+            elBotModal.classList.remove('active');
 
             if (mode === 'home') {
                 elHomeSection.classList.remove('hidden');
                 renderCalendar();
-                renderMatching();
             } else if (mode === 'settings') {
                 renderSettings();
                 elSettingsSection.classList.remove('hidden');
@@ -549,29 +838,31 @@
             }
         }
 
-        window.switchTab = (tab) => {
-            document.getElementById('tab-calendar').classList.remove('active');
-            document.getElementById('tab-matching').classList.remove('active');
-
-            elCalendarView.classList.add('hidden');
-            elMatchingView.classList.add('hidden');
-
-            if (tab === 'calendar') {
-                document.getElementById('tab-calendar').classList.id = 'active'; // Class handling fix
-                document.getElementById('tab-calendar').classList.add('active');
-                elCalendarView.classList.remove('hidden');
+        function toggleFilter(key) {
+            if (key === 'all') {
+                const isActive = document.getElementById('filter-all').classList.contains('active');
+                const newVal = !isActive;
+                document.getElementById('filter-all').classList.toggle('active', newVal);
+                activeFilters.sasami = newVal; activeFilters.tsuna = newVal;
+                activeFilters.kombu = newVal; activeFilters.offline = newVal;
+                ['sasami', 'tsuna', 'kombu', 'offline'].forEach(k => {
+                    document.getElementById('filter-' + k).classList.toggle('active', newVal);
+                });
             } else {
-                document.getElementById('tab-matching').classList.add('active');
-                elMatchingView.classList.remove('hidden');
-                renderMatching();
+                activeFilters[key] = !activeFilters[key];
+                document.getElementById('filter-' + key).classList.toggle('active', activeFilters[key]);
+                // allボタンの同期
+                const allActive = activeFilters.sasami && activeFilters.tsuna && activeFilters.kombu && activeFilters.offline;
+                document.getElementById('filter-all').classList.toggle('active', allActive);
             }
-        };
+            renderCalendar();
+        }
 
         window.toggleSection = toggleSection;
         window.showHome = () => toggleSection('home');
         window.clearData = clearData;
         window.saveSettings = saveSettings;
-        window.saveData = saveData;
+        window.startBotInteraction = startBotInteraction;
 
         // --- Settings Logic ---
         function loadConfig() {
@@ -916,20 +1207,110 @@
         window.updateTempContent = (index, val) => { tempParsedData[index].content = val; };
         window.removeItem = (index) => { tempParsedData.splice(index, 1); renderPreview(); };
 
-        // --- Data Management ---
-        function saveData() {
-            const newShifts = tempParsedData.map(t => ({
-                ...t,
-                timestamp: parseDateString(t.date)
-            }));
+        // --- Bot Interaction & Data Management ---
+        function startBotInteraction() {
+            botSelectedDates.clear();
+            elBotCalendarSelect.innerHTML = '';
+
+            // 抽出されたデータから対象の月と日付範囲を把握
+            let parsedDates = tempParsedData.map(d => parseDateString(d.date));
+            if (parsedDates.length === 0) parsedDates = [Date.now()];
+
+            let targetDateMs = parsedDates.sort((a, b) => a - b)[0];
+            let td = new Date(targetDateMs);
+            currentCalendarMonth = new Date(td.getFullYear(), td.getMonth(), 1);
+
+            const numDays = new Date(td.getFullYear(), td.getMonth() + 1, 0).getDate();
+
+            for (let i = 1; i <= numDays; i++) {
+                const btn = document.createElement('div');
+                btn.className = 'bot-date-btn';
+                btn.innerText = `${td.getMonth() + 1}/${i}`;
+                const dateKey = `${td.getFullYear()}/${td.getMonth() + 1}/${i}`;
+
+                btn.onclick = () => {
+                    if (botSelectedDates.has(dateKey)) {
+                        botSelectedDates.delete(dateKey);
+                        btn.classList.remove('selected');
+                    } else {
+                        botSelectedDates.add(dateKey);
+                        btn.classList.add('selected');
+                    }
+                };
+                elBotCalendarSelect.appendChild(btn);
+            }
+
+            elBotModal.classList.add('active');
+        }
+
+        function finishBotInteraction(hasOffline) {
+            // 保存する新しいシフトデータ
+            let newShifts = tempParsedData.map(t => {
+                let pd = new Date(parseDateString(t.date));
+                return {
+                    ...t,
+                    dateKey: `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`,
+                    timestamp: pd.getTime()
+                };
+            });
+
+            // おやすみ希望日の追加
+            if (hasOffline) {
+                botSelectedDates.forEach(dateKey => {
+                    const parts = dateKey.split('/');
+                    newShifts.push({
+                        id: Date.now() + Math.random(),
+                        date: `${parts[1]}/${parts[2]}`,
+                        dateKey: dateKey,
+                        member: "しまねこデザイン",
+                        memberColor: "#f5f5f5",
+                        type: "team_offline",
+                        content: "休業希望日",
+                        timestamp: new Date(parts[0], parts[1] - 1, parts[2]).getTime()
+                    });
+                });
+            }
 
             appData.shifts = [...appData.shifts, ...newShifts];
-            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
 
+            // 研修スケジュールの自動反映
+            appData.shifts = applyTrainingSchedules(appData.shifts);
+
+            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
             localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
 
             elInput.value = "";
+            elBotModal.classList.remove('active');
             toggleSection('home');
+        }
+
+        function applyTrainingSchedules(currentShifts) {
+            // コンブの研修日を自動挿入。既に存在する場合は重複させない。
+            const newShifts = [...currentShifts];
+            TRAINING_DATES.forEach(td => {
+                const parts = td.split('/');
+                const y = parseInt(parts[0]);
+                const m = parseInt(parts[1]);
+                const d = parseInt(parts[2]);
+
+                const dateKey = `${y}/${m}/${d}`;
+                const exists = newShifts.find(s => s.member === "コンブ" && s.dateKey === dateKey && s.content.includes('研修'));
+
+                if (!exists) {
+                    newShifts.push({
+                        id: Date.now() + Math.random(),
+                        date: `${m}/${d}`,
+                        dateKey: dateKey,
+                        member: "コンブ",
+                        memberColor: "#A5D6A7",
+                        type: "shift",
+                        content: "9-13(研修)",
+                        timestamp: new Date(y, m - 1, d).getTime(),
+                        isAuto: true
+                    });
+                }
+            });
+            return newShifts;
         }
 
         function loadData() {
@@ -937,6 +1318,8 @@
                 const raw = localStorage.getItem(STORAGE_KEY_DATA);
                 if (raw) {
                     appData = JSON.parse(raw);
+                } else {
+                    appData = { shifts: [] };
                 }
             } catch (e) {
                 console.error("Data load error", e);
@@ -949,7 +1332,6 @@
                 localStorage.removeItem(STORAGE_KEY_DATA);
                 appData = { shifts: [] };
                 renderCalendar();
-                renderMatching();
             }
         }
 
@@ -972,103 +1354,134 @@
             return new Date(2026, m - 1, d).getTime();
         }
 
-        // --- Calendar Rendering ---
+        // --- New Full Grid Calendar Rendering ---
+        function changeMonth(offset) {
+            currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + offset, 1);
+            renderCalendar();
+        }
+
         function renderCalendar() {
             elCalendarContainer.innerHTML = '';
 
-            if (!appData.shifts || appData.shifts.length === 0) {
-                elCalendarContainer.innerHTML = `<div style="text-align: center; padding: 40px; color: #aaa;">予定がありません。<br>「+ インポート」から追加してください。</div>`;
-                return;
+            const year = currentCalendarMonth.getFullYear();
+            const month = currentCalendarMonth.getMonth();
+            const firstDay = new Date(year, month, 1).getDay(); // 0(Sun) - 6(Sat)
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Header for Month
+            const monthHeader = document.getElementById('calendar-month-title');
+            if (monthHeader) {
+                monthHeader.innerText = `${year}年 ${month + 1}月`;
+            } else {
+                const headerDiv = document.createElement('div');
+                headerDiv.style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;";
+                headerDiv.innerHTML = `
+                    <button class="btn btn-sm btn-secondary" onclick="changeMonth(-1)">＜ 先月</button>
+                    <h2 id="calendar-month-title" style="margin:0;">${year}年 ${month + 1}月</h2>
+                    <button class="btn btn-sm btn-secondary" onclick="changeMonth(1)">翌月 ＞</button>
+                `;
+                elCalendarView.insertBefore(headerDiv, elCalendarView.firstChild);
             }
 
+            // データのグループ化 (dateKey単位へ)
             const grouped = {};
             appData.shifts.forEach(s => {
-                if (!grouped[s.date]) grouped[s.date] = [];
-                grouped[s.date].push(s);
+                if (!s.dateKey) {
+                    // 古いデータのマイグレーション
+                    const pd = new Date(s.timestamp || parseDateString(s.date));
+                    s.dateKey = `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`;
+                }
+                if (!grouped[s.dateKey]) grouped[s.dateKey] = [];
+                grouped[s.dateKey].push(s);
             });
 
-            let html = "";
-            Object.keys(grouped).forEach(dateStr => {
-                const shifts = grouped[dateStr];
-                const dateParts = dateStr.split(/[\/\月]/);
+            // 前月の空白セル
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-day';
+                emptyCell.style.opacity = '0.3';
+                elCalendarContainer.appendChild(emptyCell);
+            }
 
-                let barsHtml = "";
-                shifts.forEach(s => {
-                    if (s.type === 'task') {
-                        barsHtml += `
-                        <div class="shift-bar task-bar">
-                            <span class="shift-name">${s.content}</span>
-                        </div>
-                    `;
-                    } else {
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${year}/${month + 1}/${d}`;
+                const dailyData = grouped[dateKey] || [];
+
+                const cell = document.createElement('div');
+                cell.className = 'calendar-day';
+
+                // 稼働やスケジュールの分析
+                let hasTeamOffline = false;
+                let activeWorkers = 0;
+                let filteredBars = "";
+
+                dailyData.forEach(s => {
+                    let shouldShow = false;
+
+                    if (s.type === 'team_offline') {
+                        hasTeamOffline = true;
+                        if (activeFilters.offline) shouldShow = true;
+                    }
+                    else if (s.type === 'shift') {
+                        if (s.content !== "休み" && !s.content.match(/休|off|OFF/)) {
+                            activeWorkers++;
+                        }
+
                         const mConf = memberConfig.find(m => m.name === s.member);
-                        const color = mConf ? mConf.color : "#eee";
-                        barsHtml += `
-                        <div class="shift-bar" style="background-color: ${color};">
-                            <span class="shift-name">${s.member}</span>
-                            <span class="shift-time">${s.content}</span>
-                        </div>
-                    `;
+                        if (mConf) {
+                            if (mConf.id === 'sasami' && activeFilters.sasami) shouldShow = true;
+                            if (mConf.id === 'tsuna' && activeFilters.tsuna) shouldShow = true;
+                            if (mConf.id === 'kombu' && activeFilters.kombu) shouldShow = true;
+                        } else if (activeFilters.all || activeFilters.offline) {
+                            shouldShow = true; // Other tasks/unknown
+                        }
+                    } else {
+                        shouldShow = true; // Task shown always if there
+                    }
+
+                    if (shouldShow) {
+                        const color = s.memberColor || "#eee";
+
+                        if (s.type === 'task' || s.type === 'team_offline') {
+                            filteredBars += `
+                                <div class="shift-bar task-bar" style="border-left-color:${color}; background:#fff; margin-bottom: 2px;">
+                                    <span class="shift-name" style="font-size:0.75rem;">${s.content}</span>
+                                </div>
+                            `;
+                        } else {
+                            filteredBars += `
+                                <div class="shift-bar" style="background-color: ${color}; opacity: 0.9; margin-bottom: 2px;">
+                                    <span class="shift-name" style="font-size:0.75rem;">${s.member}</span>
+                                    <span class="shift-time" style="font-weight:bold;">${s.content}</span>
+                                </div>
+                            `;
+                        }
                     }
                 });
 
-                html += `
-                <div class="date-row">
-                    <div class="date-header">
-                        <div class="date-num">${dateParts[1] || dateParts[0]}</div>
-                        <div class="date-day">/ ${dateParts[0]}</div> 
-                    </div>
-                    <div class="shift-bars">
-                        ${barsHtml}
-                    </div>
-                </div>
-            `;
-            });
-
-            elCalendarContainer.innerHTML = html;
-        }
-
-        // --- Matching Logic ---
-        function renderMatching() {
-            elMatchingList.innerHTML = '';
-            if (!appData.shifts || appData.shifts.length === 0) {
-                elMatchingList.innerHTML = `<p style="text-align:center; color:#aaa;">データがありません</p>`;
-                return;
-            }
-
-            const grouped = {};
-            appData.shifts.forEach(s => {
-                if (s.type === 'shift' && !s.content.includes('休')) {
-                    if (!grouped[s.date]) grouped[s.date] = new Set();
-                    grouped[s.date].add(s.member);
+                // 行動解析 (クラス付与)
+                let badgeHtml = "";
+                if (hasTeamOffline) {
+                    cell.classList.add('offline');
+                } else if (activeWorkers === 3) {
+                    cell.classList.add('collaboration');
+                    badgeHtml = `<span class="badge">3人日</span>`;
+                } else if (activeWorkers === 0 && dailyData.length > 0) {
+                    // 全員休みの場合稼働おススメ？ User requested: "全員が動ける日だけ... 三人が動きやすい日をハイライトして"
+                    // おそらく「シフトが入っていない＆チームオフがない＝全員動ける」という解釈。
+                    // 逆に、すでにデータはあるけど3人ともシフトで"休み"の場合を稼働可能日とする（別の業務に回れる）
+                    // ひとまず、3人休みの日を Recommended にする。
+                    cell.classList.add('recommended');
+                    badgeHtml = `<span class="badge" style="background:#81C784; color:white;">作業おススメ✨</span>`;
                 }
-            });
 
-            // Current required members count = 4 (assuming all must work?)
-            // Let's filter days where ALL 4 members are working
-            const targetCount = memberConfig.length;
-
-            let found = false;
-            Object.keys(grouped).forEach(dateStr => {
-                const workingMembers = grouped[dateStr];
-                if (workingMembers.size >= targetCount) {
-                    // Assuming overlap: 13:00-16:00 (Placeholder logic)
-                    const div = document.createElement('div');
-                    div.className = 'matching-item';
-                    div.innerHTML = `
-                    <span>${dateStr}</span>
-                    <span>🕒 ミーティングOK</span>
+                cell.innerHTML = `
+                    <div class="date-header">${d} ${badgeHtml}</div>
+                    <div class="calendar-day-content">${filteredBars}</div>
                 `;
-                    elMatchingList.appendChild(div);
-                    found = true;
-                }
-            });
-
-            if (!found) {
-                elMatchingList.innerHTML = `<p style="text-align:center; color:#aaa;">全員が揃う日は今のところありません...</p>`;
+                elCalendarContainer.appendChild(cell);
             }
         }
-
     </script>
 
 </body>
