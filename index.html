@@ -67,6 +67,12 @@
         }
 
         .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        .settings-container {
             max-width: 600px;
             margin: 0 auto;
         }
@@ -299,18 +305,21 @@
             background: var(--color-white);
             border-radius: var(--radius-sm);
             border: 1px solid var(--color-border);
-            min-height: 100px;
-            padding: 4px;
+            min-height: 140px;
+            /* PCでは大きく */
+            padding: 8px;
             display: flex;
             flex-direction: column;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             transition: all 0.2s;
         }
 
-        /* スマホ用レスポンシブ (カードレイアウトへ移行) */
-        @media (max-width: 600px) {
+        /* スマホ用簡易版リスト表示 */
+        @media (max-width: 768px) {
             .calendar-grid {
-                grid-template-columns: 1fr;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
             }
 
             .weekday-header {
@@ -319,22 +328,23 @@
 
             .calendar-day {
                 min-height: auto;
-                padding: 12px;
-                gap: 8px;
-                flex-direction: row;
-                align-items: flex-start;
+                padding: 16px;
+                flex-direction: column;
+                border-radius: 12px;
+                border: 1px solid var(--color-border);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
             }
 
-            .calendar-day .date-header {
-                width: 50px;
-                flex-shrink: 0;
-                text-align: center;
-                border-right: 2px solid var(--color-bg);
-                margin-right: 8px;
+            .calendar-day.empty-mobile {
+                display: none !important;
+                /* スマホでは空白の日(前月の余白など)は非表示にする */
             }
 
-            .calendar-day-content {
-                flex: 1;
+            .date-header {
+                font-size: 1.1rem !important;
+                border-bottom: 2px dashed var(--color-border);
+                padding-bottom: 8px;
+                margin-bottom: 8px;
             }
         }
 
@@ -600,13 +610,13 @@
 
 <body>
 
-    <div class="container">
-        <header>
+    <div class="container" id="main-container">
+        <header class="settings-container">
             <h1 style="cursor: pointer;" onclick="showHome()">🐈 しまねこ予定表 Pro</h1>
         </header>
 
         <section id="home-section">
-            <div class="card" style="padding: 16px;">
+            <div class="card settings-container" style="padding: 16px; max-width: 1400px; margin-bottom: 16px;">
                 <div class="calendar-header-actions" style="flex-direction: column; align-items: flex-start;">
                     <div class="filter-group">
                         <button class="filter-btn active" onclick="toggleFilter('all')" id="filter-all">全て表示</button>
@@ -1459,7 +1469,7 @@
             // 前月の空白セル
             for (let i = 0; i < firstDay; i++) {
                 const emptyCell = document.createElement('div');
-                emptyCell.className = 'calendar-day';
+                emptyCell.className = 'calendar-day empty-mobile';
                 emptyCell.style.opacity = '0.3';
                 elCalendarContainer.appendChild(emptyCell);
             }
