@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>しまねこ予定表 Pro - 使い方ガイド</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #FFFBF0;
+            --color-text: #5D4037;
+            --color-primary: #FFB74D;
+            --color-secondary: #FFCC80;
+            --color-accent: #FF9800;
+            --color-border: #FFE0B2;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'M PLUS Rounded 1c', "Hiragino Maru Gothic ProN", sans-serif;
+            color: var(--color-text);
+        }
+
+        body {
+            background-color: var(--color-bg);
+            line-height: 1.6;
+            padding: 24px 16px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--color-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .guide-section {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 2px solid var(--color-border);
+            box-shadow: 0 4px 12px rgba(255, 183, 77, 0.1);
+        }
+
+        .guide-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            border-bottom: 2px dashed var(--color-border);
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .guide-step {
+            margin-bottom: 24px;
+        }
+
+        .guide-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--color-accent);
+        }
+
+        .step-desc {
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            color: #666;
+        }
+
+        .mock-ui {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .mock-calendar-cell {
+            background: white;
+            border: 2px solid #FF9800;
+            border-radius: var(--radius-sm);
+            padding: 8px;
+            width: 200px;
+            box-shadow: 0 0 8px rgba(255, 152, 0, 0.2);
+            background-color: #FFF8E1;
+        }
+
+        .mock-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        .badge-full {
+            background: #FFAB91;
+            color: white;
+        }
+
+        .badge-afternoon {
+            background: #FFCC80;
+            color: #333;
+        }
+
+        .badge-evening {
+            background: #FFE082;
+            color: #333;
+        }
+
+        .mock-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #ccc;
+            margin-top: 4px;
+        }
+
+        .mock-bar>div {
+            flex: 1;
+            border-right: 1px solid white;
+        }
+
+        .mock-bar>div:last-child {
+            border-right: none;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--color-primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 100px;
+            text-decoration: none;
+            font-weight: bold;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            background-color: var(--color-accent);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: var(--color-accent);
+            border: 2px solid var(--color-accent);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background-color: var(--color-bg);
+        }
+
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 32px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>📖 しまねこ予定表 使い方ガイド</h1>
+        <p style="font-size: 0.9rem; margin-top: 8px;">アプリの便利な機能を図解でご案内します</p>
+    </header>
+
+    <div class="guide-section">
+        <h2>① カレンダーの見方（空き時間の判別）</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                誰がいつ空いているか、ミーティングがいつできるかが一目でわかるように、1日を「午前・午後・夕方以降」の3つに分けて自動判定しています。
+            </p>
+            <div class="mock-ui" style="display:flex; justify-content:center;">
+                <div class="mock-calendar-cell">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:bold;">25</span>
+                        <div>
+                            <span class="mock-badge badge-afternoon">午後OK</span>
+                        </div>
+                    </div>
+
+                    <div
+                        style="background:#F48FB120; border-radius:4px; padding:4px; margin-bottom:4px; font-size:0.8rem;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <b>ササミ</b> <span
+                                style="font-size:0.7rem; background:white; padding:0 2px; border-radius:2px;">0→7</span>
+                        </div>
+                        <div class="mock-bar">
+                            <div style="background:white;"></div> <!-- 午前寝てる -->
+                            <div style="background:#F48FB1;"></div> <!-- 午後OK -->
+                            <div style="background:#F48FB1;"></div> <!-- 夕方OK -->
+                        </div>
+                    </div>
+
+                    <div style="background:#A5D6A720; border-radius:4px; padding:4px; font-size:0.8rem;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <b>コンブ</b> <span
+                                style="font-size:0.7rem; background:white; padding:0 2px; border-radius:2px;">9-13(研修)</span>
+                        </div>
+                        <div class="mock-bar">
+                            <div style="background:white;"></div> <!-- 午前NG -->
+                            <div style="background:#A5D6A7;"></div> <!-- 午後OK -->
+                            <div style="background:#A5D6A7;"></div> <!-- 夕方OK -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.85rem; margin-top:8px; color:#666;">
+                ※ 色のついたバーが「空いている時間」です。白抜きは「仕事中（または睡眠中）」を表します。<br>
+                ※ ササミさん（0→7）の場合、夜勤明けのため午前中は「睡眠」として判定し、午後・夕方を空き時間とみなします。
+            </p>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <h2>② 予定を登録する（画像読み込み）</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                スマホで見ているシフト表のスクリーンショット（スクショ）から、自動でシフトを抜き出してカレンダーに入力できます。
+            </p>
+            <div class="mock-ui">
+                <p style="margin-bottom:8px;"><b>1. トップ画面の「＋ インポート」を押す</b></p>
+                <button class="btn" style="padding: 4px 16px; font-size:0.9rem; pointer-events: none;">＋ インポート</button>
+
+                <p style="margin:16px 0 8px;"><b>2. カメラ枠に画像をドロップ（スマホならタップしてアルバムから選択）</b></p>
+                <div
+                    style="border:2px dashed #ccc; background:white; padding:24px; text-align:center; border-radius:8px;">
+                    📷 画像をここにドロップ<br><span style="font-size:0.8rem; color:#aaa;">スマホの場合はタップして写真を選択</span>
+                </div>
+
+                <p style="margin:16px 0 8px;"><b>3. AIが文字を解析！間違っていれば修正して保存</b></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <h2>③ 予定を手動で追加・修正する</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                AI解析を使わずに、特定の日付の予定を1つずつピンポイントで追加したり、「ミーティング予定」を入れることもできます。
+            </p>
+            <div class="mock-ui">
+                <p style="font-weight:bold; margin-bottom:8px; color:#555;">✍️ 予定を手動で追加 (インポート画面内)</p>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" value="2026-03-25"
+                        style="padding:6px; border:1px solid #ccc; border-radius:4px; flex:1;" readonly>
+                    <select style="padding:6px; border:1px solid #ccc; border-radius:4px; flex:1;" disabled>
+                        <option>全員/〆</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" value="しまねこミーティング"
+                        style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px;" readonly>
+                    <button class="btn btn-sm"
+                        style="flex:1; background-color:#FF9800; color:white; border:none; padding:8px;"
+                        disabled>追加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <h2>④ 絞り込みフィルターを活用する</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                「今月、夕方・夜なら全員あつまれそうな日はないかな？」といった時に、ボタン1つでカレンダーを絞り込めます。
+            </p>
+            <div class="mock-ui" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                <button
+                    style="border: 1px solid #ccc; background: white; padding: 4px 12px; border-radius: 100px; font-size: 0.85rem;">すべて</button>
+                <button
+                    style="border: 2px solid #FF9800; background: #FFF8E1; padding: 4px 12px; border-radius: 100px; font-size: 0.85rem; font-weight:bold; color:#FF9800;">午後(13~)
+                    3人OK</button>
+                <button
+                    style="border: 1px solid #ccc; background: white; padding: 4px 12px; border-radius: 100px; font-size: 0.85rem;">夕方(16~)
+                    3人OK</button>
+            </div>
+            <p style="font-size:0.85rem; margin-top:8px; color:#666;">
+                該当する日以外はグレーアウト（白黒表示）されるため、すぐに予定を立てられる日が見つかります。
+            </p>
+        </div>
+    </div>
+
+    <div class="nav-buttons">
+        <a href="index.html" class="btn">カレンダーに戻る</a>
+    </div>
+
+</body>
+
+</html>
