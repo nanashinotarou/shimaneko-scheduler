@@ -764,10 +764,13 @@
         ];
 
         // 研修対象日（自動的にコンブの9-13時が入る日）
-        // 研修まとめサイトの仕様に合わせ、2月と3月の全日程を対象とする
-        const TRAINING_DATES = [];
-        for (let i = 1; i <= 28; i++) TRAINING_DATES.push(`2026/02/${String(i).padStart(2, '0')}`);
-        for (let i = 1; i <= 31; i++) TRAINING_DATES.push(`2026/03/${String(i).padStart(2, '0')}`);
+        // 研修まとめサイトのカリキュラム指定日に合わせる
+        const TRAINING_DATES = [
+            // 2月 (TikTok Marketing)
+            ...[3, 4, 5, 10, 12, 13, 17, 18, 19, 24, 25, 26, 27].map(d => `2026/02/${String(d).padStart(2, '0')}`),
+            // 3月 (Generative AI & Prompt)
+            ...[3, 4, 5, 10, 11, 12, 17, 18, 19, 24, 25, 26, 31].map(d => `2026/03/${String(d).padStart(2, '0')}`)
+        ];
 
         const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v4"; // Change key for new data format
         const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
