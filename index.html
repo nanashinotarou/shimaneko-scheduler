@@ -1524,10 +1524,10 @@
             // データのグループ化 (dateKey単位へ)
             const grouped = {};
             appData.shifts.forEach(s => {
-                if (!s.dateKey) {
-                    // 古いデータのマイグレーション
+                if (!s.dateKey || s.dateKey.includes(" ")) {
+                    // 古いデータのマイグレーション または 空白混入バグの修正
                     const pd = new Date(s.timestamp || parseDateString(s.date));
-                    s.dateKey = `${pd.getFullYear()} /${pd.getMonth() + 1}/${pd.getDate()} `;
+                    s.dateKey = `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`;
                 }
                 if (!grouped[s.dateKey]) grouped[s.dateKey] = [];
                 grouped[s.dateKey].push(s);
@@ -1542,7 +1542,7 @@
             }
 
             for (let d = 1; d <= daysInMonth; d++) {
-                const dateKey = `${year} /${month + 1}/${d} `;
+                const dateKey = `${year}/${month + 1}/${d}`;
                 const dailyData = grouped[dateKey] || [];
 
                 const cell = document.createElement('div');
