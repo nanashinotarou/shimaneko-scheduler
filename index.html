@@ -866,8 +866,10 @@
 
         // Init
         loadConfig();
-        loadData();
-        renderCalendar();
+        (async () => {
+            await loadData();
+            renderCalendar();
+        })();
 
         // Events
         document.getElementById('btn-analyze').addEventListener('click', analyzeText);
@@ -1380,11 +1382,12 @@
             appData.shifts = applyTrainingSchedules(appData.shifts);
 
             appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
-            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
 
-            elInput.value = "";
-            elBotModal.classList.remove('active');
-            toggleSection('home');
+            saveDataToCloud(newShifts).then(() => {
+                elInput.value = "";
+                elBotModal.classList.remove('active');
+                toggleSection('home');
+            });
         }
 
         function injectMarchData() {
@@ -1438,12 +1441,12 @@
             appData.shifts = uniqueShifts;
             appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
 
-            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
-
-            // カレンダーを3月に移動させて再描画
-            currentCalendarMonth = new Date(2026, 2, 1); // 3月
-            alert("3月のスケジュールを反映しました！");
-            showHome();
+            saveDataToCloud(newShifts).then(() => {
+                // カレンダーを3月に移動させて再描画
+                currentCalendarMonth = new Date(2026, 2, 1); // 3月
+                alert("3月のスケジュールを反映しました！");
+                showHome();
+            });
         }
 
         function addManualShift() {
@@ -1494,15 +1497,15 @@
             appData.shifts = uniqueShifts;
             appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
 
-            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+            saveDataToCloud([newShift]).then(() => {
+                currentCalendarMonth = new Date(y, m - 1, 1);
+                alert("予定を手動で追加しました！");
 
-            currentCalendarMonth = new Date(y, m - 1, 1);
-            alert("予定を手動で追加しました！");
-
-            // Clear inputs
-            document.getElementById('manual-date').value = "";
-            document.getElementById('manual-content').value = "";
-            showHome();
+                // Clear inputs
+                document.getElementById('manual-date').value = "";
+                document.getElementById('manual-content').value = "";
+                showHome();
+            });
         }
 
         function applyTrainingSchedules(currentShifts) {
@@ -1534,22 +1537,52 @@
             return newShifts;
         }
 
-        function loadData() {
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxryQqh5aRuLgPOTJLm0Pll7uA2o8HLCkRQNESe-O1vLT6lNOC7zJCADYTP32vFvCtp/exec";
+
+        async function loadData() {
             try {
+                elLoading.classList.remove('hidden');
+                elLoadingText.innerText = "クラウドからカレンダーを同期中...";
+                const response = await fetch(GAS_WEB_APP_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                const cloudData = await response.json();
+                appData.shifts = Array.isArray(cloudData) ? cloudData : [];
+                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+            } catch (e) {
+                console.error("Data load error", e);
                 const raw = localStorage.getItem(STORAGE_KEY_DATA);
                 if (raw) {
                     appData = JSON.parse(raw);
+                    console.log("Loaded offline data from local storage.");
                 } else {
                     appData = { shifts: [] };
                 }
+            } finally {
+                elLoading.classList.add('hidden');
+            }
+        }
+
+        async function saveDataToCloud(shiftsToPush) {
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+            if (!shiftsToPush || shiftsToPush.length === 0) return;
+            try {
+                elLoading.classList.remove('hidden');
+                elLoadingText.innerText = "クラウドへカレンダーを保存中...";
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(shiftsToPush),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                await response.json();
             } catch (e) {
-                console.error("Data load error", e);
-                appData = { shifts: [] };
+                console.error("Cloud save failed", e);
+            } finally {
+                elLoading.classList.add('hidden');
             }
         }
 
         function clearData() {
-            if (confirm("全てのデータを削除しますか？")) {
+            if (confirm("ブラウザ上のローカルデータを削除しますか？\n（現在、クラウドDBの一括削除機能はありません）")) {
                 localStorage.removeItem(STORAGE_KEY_DATA);
                 appData = { shifts: [] };
                 renderCalendar();
