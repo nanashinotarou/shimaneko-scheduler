@@ -837,8 +837,10 @@
         let availFilter = 'avail-all'; // 'avail-all', 'avail-afternoon', 'avail-evening', 'avail-fullday'
 
         let botSelectedDates = new Set();
-        let currentCalendarMonth = new Date(2026, 1, 1); // 2026年2月デフォルト
-
+        let _initDate = new Date();
+        _initDate.setDate(1);
+        _initDate.setHours(0, 0, 0, 0);
+        let currentCalendarMonth = _initDate;
         // Valid DOM Elements check
         const elHomeSection = document.getElementById('home-section');
         const elSettingsSection = document.getElementById('settings-section');
@@ -1783,6 +1785,17 @@
                     cell.style.border = '2px solid #FF9800';
                     cell.style.boxShadow = '0 0 8px rgba(255, 152, 0, 0.4)';
                     cell.style.backgroundColor = '#FFF8E1';
+                }
+
+                const today = new Date();
+                const isToday = (year === today.getFullYear() && month === today.getMonth() && d === today.getDate());
+
+                if (isToday) {
+                    cell.style.border = '2px solid #4CAF50';
+                    cell.style.boxShadow = '0 0 8px rgba(76, 175, 80, 0.4)';
+                    if (!highlightCell) {
+                        cell.style.backgroundColor = '#F1F8E9';
+                    }
                 }
 
                 cell.innerHTML = `
