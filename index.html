@@ -12,8 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap"
         rel="stylesheet">
 
-    <!-- Tesseract.js -->
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <!-- Removed Tesseract.js for Gemini API Integration -->
 
     <style>
         :root {
@@ -404,6 +403,15 @@
                 <button class="btn btn-sm btn-secondary" onclick="saveSettings()">保存して閉じる</button>
             </div>
 
+            <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px dashed var(--color-border);">
+                <div class="member-header">
+                    <span>🤖 Gemini API キー</span>
+                </div>
+                <label style="font-size:0.8rem;">画像の高精度解析に使用します（ローカルのみ保存・外部送信なし）</label>
+                <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (APIキーを入力)">
+                <p style="font-size:0.75rem; color:#888; margin-top:4px;">Google AI Studioで取得したAPIキーを設定してください。</p>
+            </div>
+
             <p style="font-size:0.9rem; margin-bottom:16px;">
                 シフト表に書かれている名前（キーワード）を設定してください。<br>
                 ※カンマ区切りで複数指定できます。
@@ -469,8 +477,10 @@
 
         const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v3";
         const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
+        const STORAGE_KEY_API = "shimaneko_scheduler_gemini_key";
 
         let memberConfig = [];
+        let geminiApiKey = "";
         let appData = { shifts: [] };
         let tempParsedData = [];
 
@@ -574,6 +584,8 @@
                 } else {
                     memberConfig = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
                 }
+
+                geminiApiKey = localStorage.getItem(STORAGE_KEY_API) || "";
             } catch (e) {
                 console.error("Config load error", e);
                 memberConfig = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
@@ -583,6 +595,9 @@
         function renderSettings() {
             const list = document.getElementById('settings-list');
             list.innerHTML = '';
+
+            document.getElementById('setting-gemini-key').value = geminiApiKey;
+
             memberConfig.forEach((m, idx) => {
                 const div = document.createElement('div');
                 div.className = 'member-setting-item';
@@ -604,8 +619,22 @@
                 if (el) m.keywords = el.value;
             });
             localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(memberConfig));
+
+            geminiApiKey = document.getElementById('setting-gemini-key').value.trim();
+            localStorage.setItem(STORAGE_KEY_API, geminiApiKey);
+
             alert("設定を保存しました。");
             toggleSection('home');
+        }
+
+        // --- Image to Base64 ---
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data URL prefix
+                reader.onerror = error => reject(error);
+            });
         }
 
         // --- OCR Logic ---
@@ -620,21 +649,102 @@
         async function handleImageFile(file) {
             if (!file) return;
 
+            if (!geminiApiKey) {
+                alert("設定画面からGemini APIキーを設定してください。画像解析には本物のAIを利用します。");
+                toggleSection('settings');
+                return;
+            }
+
             elLoading.classList.remove('hidden');
-            elLoadingText.innerText = "画像を解析中...\\n(これには少し時間がかかります)";
+            elLoadingText.innerText = "Gemini AIが画像を解析中...\\n(これには数秒かかります)";
 
             try {
-                const worker = await Tesseract.createWorker('jpn');
-                const ret = await worker.recognize(file);
+                const base64Image = await fileToBase64(file);
 
-                const currentVal = elInput.value;
-                elInput.value = (currentVal ? currentVal + "\\n\\n" : "") + ret.data.text;
+                // Construct prompt dynamically with member configurations
+                const memberNamesStr = memberConfig.map(m => `「${m.name}」（キーワード: ${m.keywords}）`).join("、");
 
-                await worker.terminate();
-                elLoading.classList.add('hidden');
+                const promptText = `
+以下の画像はスタッフのシフト表です。
+この中から、${memberNamesStr} のシフト情報のみを抽出して、以下のJSON配列の形式で出力してください。
+マークダウンのコードブロック (\`\`\`json) は含めちゃだめです。直接JSONテキストだけを返してください。
+
+注意点:
+- 日付は "M/D" の形式で抽出すること（例: "2/2", "2/20"）。
+- 時間は "10-19", "4.5", "11→" など、画像に書かれている通りに抽出してください。
+- "休", "off", "OFF", または○印や空白で無表記の場合は "休み" として扱ってください。
+- 対象外の人の情報は一切含めないでください。
+- どうしても読み取れない箇所は "要確認" などとしてください。
+
+[
+  { "date": "2/2", "member": "ササミ", "content": "休み" },
+  { "date": "2/2", "member": "ツナ", "content": "10-19" },
+  { "date": "2/3", "member": "ササミ", "content": "4.5" }
+]
+`;
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptText },
+                                {
+                                    inlineData: {
+                                        mimeType: file.type || 'image/jpeg',
+                                        data: base64Image
+                                    }
+                                }
+                            ]
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(\`API HTTP Error: \${response.status}\`);
+                }
+
+                const data = await response.json();
+                let resultText = data.candidates[0].content.parts[0].text;
+                
+                // Clean up any potential markdown formatting from Gemini
+                resultText = resultText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+                
+                try {
+                    const parsedJson = JSON.parse(resultText);
+                    
+                    // Add mapping data for colors
+                    tempParsedData = parsedJson.map(item => {
+                        const mconf = memberConfig.find(m => m.name === item.member);
+                        return {
+                            id: Date.now() + Math.random(),
+                            date: item.date,
+                            member: item.member,
+                            memberColor: mconf ? mconf.color : '#CCC',
+                            type: 'shift',
+                            content: item.content
+                        };
+                    });
+                    
+                    // Show in textarea as fallback text, although we skip analyzeText
+                    elInput.value = JSON.stringify(tempParsedData, null, 2);
+                    
+                    elLoading.classList.add('hidden');
+                    renderPreview();
+                    toggleSection('preview');
+                    
+                } catch (jsonErr) {
+                    console.error("JSON Parsing Error from Gemini output:", resultText);
+                    alert("Geminiからの応答形式が不正でした。もう一度お試しください。");
+                    elLoading.classList.add('hidden');
+                }
+
             } catch (err) {
                 console.error(err);
-                alert("画像解析に失敗しました: " + err);
+                alert("Gemini画像解析に失敗しました: " + err);
                 elLoading.classList.add('hidden');
             }
         }
@@ -682,7 +792,7 @@
                 const dateMatch = trimmed.match(dateRegex);
                 let lineDate = null;
                 if (dateMatch) {
-                    lineDate = `${dateMatch[1]}/${dateMatch[2]}`;
+                    lineDate = `${ dateMatch[1]} / ${ dateMatch[2]}`;
                     currentDate = lineDate;
                 }
 
@@ -782,7 +892,7 @@
                 const div = document.createElement('div');
                 div.className = 'preview-item';
                 div.innerHTML = `
-                <div class="preview-meta">
+                    < div class= "preview-meta" >
                     <input type="date" style="padding:4px;" value="${ymd}" onchange="window.updateTempDate(${index}, this.value)">
                     <span class="preview-member" style="background:${item.memberColor};">${item.member}</span>
                 </div>
