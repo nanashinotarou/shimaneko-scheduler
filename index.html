@@ -643,7 +643,7 @@
                     <div style="display: flex; gap: 8px;">
                         <button class="btn btn-sm" onclick="toggleSection('import')">+ インポート</button>
                         <button class="btn btn-sm btn-secondary" onclick="toggleSection('settings')">⚙️ 設定</button>
-                        <a href="guide.html" target="_blank" class="btn btn-sm" style="background-color: #4CAF50;">📖
+                        <a href="guide.html" class="btn btn-sm" style="background-color: #4CAF50;">📖
                             使い方ガイド</a>
                     </div>
                     <button class="btn btn-sm btn-secondary" onclick="clearData()">クリア</button>
@@ -685,11 +685,20 @@
             </div>
 
             <div class="card" style="background-color: #E8F5E9; border-color: #A5D6A7; margin-bottom: 24px;">
-                <h3 style="color: #2E7D32; margin-bottom: 8px;">🌸 期間限定：3月のシフト一括登録</h3>
+                <h3 style="color: #2E7D32; margin-bottom: 8px;">☁️ ローカルデータをクラウドへ同期</h3>
                 <p style="font-size: 0.85rem; margin-bottom: 12px; color: #388E3C;">
+                    このブラウザ（PCやスマホ）に保存されている既存のスケジュールデータを、クラウドのデータベース（スプレッドシート）へ一括で送信し、他のメンバーと共有できるようにします。<br>※既に同期済みのデータは重複しません。
+                </p>
+                <button class="btn" onclick="syncLocalToCloud()"
+                    style="background-color: #4CAF50; color: white; border: none;">⬆️ 今すぐクラウドへ同期する</button>
+            </div>
+
+            <div class="card" style="background-color: #FFF3E0; border-color: #FFCC80; margin-bottom: 24px;">
+                <h3 style="color: #E65100; margin-bottom: 8px;">🌸 期間限定：3月のシフト一括登録</h3>
+                <p style="font-size: 0.85rem; margin-bottom: 12px; color: #E65100;">
                     ツナ（カニ屋）とササミ（カニ屋＆リンクモア）の3月分のスケジュールをワンクリックで追加します。<br>既存のデータは保持されたまま追加されます。</p>
                 <button class="btn" onclick="injectMarchData()"
-                    style="background-color: #4CAF50; color: white; border: none;">✅ 3月分を反映する</button>
+                    style="background-color: #FF9800; color: white; border: none;">✅ 3月分を反映する</button>
             </div>
 
             <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px dashed var(--color-border);">
@@ -1446,6 +1455,17 @@
                 currentCalendarMonth = new Date(2026, 2, 1); // 3月
                 alert("3月のスケジュールを反映しました！");
                 showHome();
+            });
+        }
+
+        function syncLocalToCloud() {
+            if (!confirm("現在このブラウザに保存されているすべてのスケジュールデータをクラウドへ同期します。よろしいですか？")) return;
+            if (!appData.shifts || appData.shifts.length === 0) {
+                alert("同期するローカルデータがありません。");
+                return;
+            }
+            saveDataToCloud(appData.shifts).then(() => {
+                alert(`計 ${appData.shifts.length} 件のデータをクラウドへ送信しました！\n（既に存在しているデータは重複登録されません）`);
             });
         }
 
