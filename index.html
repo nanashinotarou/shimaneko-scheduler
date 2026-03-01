@@ -1434,6 +1434,7 @@
                 // 稼働やスケジュールの分析
                 let hasTeamOffline = false;
                 let activeWorkers = 0;
+                let offWorkers = 0;
                 let filteredBars = "";
 
                 dailyData.forEach(s => {
@@ -1444,8 +1445,11 @@
                         if (activeFilters.offline) shouldShow = true;
                     }
                     else if (s.type === 'shift') {
-                        if (s.content !== "休み" && !s.content.match(/休|off|OFF/)) {
+                        const isOff = s.content && !!s.content.match(/休|off|OFF/);
+                        if (!isOff) {
                             activeWorkers++;
+                        } else {
+                            offWorkers++;
                         }
 
                         const mConf = memberConfig.find(m => m.name === s.member);
@@ -1500,16 +1504,10 @@
                 let badgeHtml = "";
                 if (hasTeamOffline) {
                     cell.classList.add('offline');
-                } else if (activeWorkers === 3) {
-                    cell.classList.add('collaboration');
-                    badgeHtml = `<span class="badge">3人日</span>`;
-                } else if (activeWorkers === 0 && dailyData.length > 0) {
-                    // 全員休みの場合稼働おススメ？ User requested: "全員が動ける日だけ... 三人が動きやすい日をハイライトして"
-                    // おそらく「シフトが入っていない＆チームオフがない＝全員動ける」という解釈。
-                    // 逆に、すでにデータはあるけど3人ともシフトで"休み"の場合を稼働可能日とする（別の業務に回れる）
-                    // ひとまず、3人休みの日を Recommended にする。
+                } else if (offWorkers >= 3) {
+                    // 全員が休み（＝しまねこデザインとして集まれる日）
                     cell.classList.add('recommended');
-                    badgeHtml = `<span class="badge" style="background:#81C784; color:white;">作業おススメ✨</span>`;
+                    badgeHtml = `<span class="badge" style="background:#FFD54F; color:#333; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✨3人日✨</span>`;
                 }
 
                 cell.innerHTML = `
