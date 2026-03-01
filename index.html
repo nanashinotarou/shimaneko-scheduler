@@ -607,13 +607,25 @@
 
         <section id="home-section">
             <div class="card" style="padding: 16px;">
-                <div class="calendar-header-actions">
+                <div class="calendar-header-actions" style="flex-direction: column; align-items: flex-start;">
                     <div class="filter-group">
-                        <button class="filter-btn active" onclick="toggleFilter('all')" id="filter-all">全て</button>
+                        <button class="filter-btn active" onclick="toggleFilter('all')" id="filter-all">全て表示</button>
                         <button class="filter-btn" onclick="toggleFilter('sasami')" id="filter-sasami">ササミ</button>
                         <button class="filter-btn" onclick="toggleFilter('tsuna')" id="filter-tsuna">ツナ</button>
                         <button class="filter-btn" onclick="toggleFilter('kombu')" id="filter-kombu">コンブ</button>
                         <button class="filter-btn" onclick="toggleFilter('offline')" id="filter-offline">休業日</button>
+                    </div>
+                    <div class="filter-group" style="margin-top: 8px;">
+                        <span
+                            style="font-size: 0.8rem; color: #666; font-weight: bold; margin-right: 8px;">ミーティング可能:</span>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-all')"
+                            id="filter-avail-all">すべて</button>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-afternoon')"
+                            id="filter-avail-afternoon">午後(13~) 3人OK</button>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-evening')"
+                            id="filter-avail-evening">夕方(16~) 3人OK</button>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-fullday')"
+                            id="filter-avail-fullday">終日 3人OK</button>
                     </div>
                 </div>
 
@@ -784,6 +796,8 @@
         let activeFilters = {
             sasami: true, tsuna: true, kombu: true, offline: true
         };
+        let availFilter = 'avail-all'; // 'avail-all', 'avail-afternoon', 'avail-evening', 'avail-fullday'
+
         let botSelectedDates = new Set();
         let currentCalendarMonth = new Date(2026, 1, 1); // 2026年2月デフォルト
 
@@ -869,6 +883,15 @@
                 const allActive = activeFilters.sasami && activeFilters.tsuna && activeFilters.kombu && activeFilters.offline;
                 document.getElementById('filter-all').classList.toggle('active', allActive);
             }
+            renderCalendar();
+        }
+
+        function toggleAvailFilter(filterId) {
+            availFilter = filterId;
+            ['avail-all', 'avail-afternoon', 'avail-evening', 'avail-fullday'].forEach(id => {
+                document.getElementById('filter-' + id).classList.remove('active');
+            });
+            document.getElementById('filter-' + filterId).classList.add('active');
             renderCalendar();
         }
 
@@ -1450,9 +1473,9 @@
 
                 // 稼働やスケジュールの分析
                 let hasTeamOffline = false;
-                let activeWorkers = 0;
-                let offWorkers = 0;
                 let filteredBars = "";
+                let freeCounts = { morning: 0, afternoon: 0, evening: 0 };
+                let trackedShiftCount = 0;
 
                 dailyData.forEach(s => {
                     let shouldShow = false;
@@ -1462,12 +1485,31 @@
                         if (activeFilters.offline) shouldShow = true;
                     }
                     else if (s.type === 'shift') {
-                        const isOff = s.content && !!s.content.match(/休|off|OFF/);
-                        if (!isOff) {
-                            activeWorkers++;
-                        } else {
-                            offWorkers++;
+                        trackedShiftCount++;
+
+                        let m = false, a = false, e = false;
+                        const content = s.content || "";
+                        const isOff = !!content.match(/休|off|OFF|公休/);
+
+                        if (isOff) {
+                            m = a = e = true;
+                        } else if (content.match(/0[\→\>]/) || content.match(/11[\→\>]/)) {
+                            // Midnight/Morning shift finishes early -> free rest of day
+                            m = a = e = true;
+                        } else if (content.match(/9-13/)) {
+                            // Morning training finishes at 13 -> free afternoon/evening
+                            a = e = true;
+                        } else if (content.match(/早番/)) {
+                            a = e = true;
                         }
+                        else {
+                            // Standard work -> free evening
+                            e = true;
+                        }
+
+                        if (m) freeCounts.morning++;
+                        if (a) freeCounts.afternoon++;
+                        if (e) freeCounts.evening++;
 
                         const mConf = memberConfig.find(m => m.name === s.member);
                         if (mConf) {
@@ -1477,58 +1519,111 @@
                         } else if (activeFilters.all || activeFilters.offline) {
                             shouldShow = true; // Other tasks/unknown
                         }
+
+                        // バーの生成 (表示対象の場合のみ)
+                        if (shouldShow) {
+                            const color = s.memberColor || "#eee";
+
+                            if (isOff) {
+                                filteredBars += `
+                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between;">
+                                        <span class="shift-name">${s.member}</span>
+                                        <span class="shift-time" style="text-decoration: line-through;">休み</span>
+                                    </div>
+                                `;
+                            } else {
+                                // タイムラインバー表現
+                                const barM = m ? '#fff' : color;
+                                const barA = a ? '#fff' : color;
+                                const barE = e ? '#fff' : color;
+
+                                filteredBars += `
+                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                            <span class="shift-name" style="font-weight:bold;">${s.member}</span>
+                                            <span style="font-size: 0.7rem; color: #666; background: #fff; padding: 0 3px; border-radius: 2px;">${content}</span>
+                                        </div>
+                                        <div style="display:flex; height: 6px; border-radius: 3px; overflow: hidden; border: 1px solid ${color}50;">
+                                            <div style="flex:1; background:${barM}; border-right:1px solid #fff;"></div>
+                                            <div style="flex:1; background:${barA}; border-right:1px solid #fff;"></div>
+                                            <div style="flex:1; background:${barE};"></div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        }
+
                     } else {
                         shouldShow = true; // Task shown always if there
-                    }
-
-                    if (shouldShow) {
-                        const color = s.memberColor || "#eee";
-
-                        if (s.type === 'team_offline') {
-                            filteredBars += `
-                                <div class="shift-item" style="background: repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 5px, #e8e8e8 5px, #e8e8e8 10px); border: 1px solid #ccc; color: #555; padding: 4px; border-radius: 4px; font-size: 0.75rem; text-align: center; margin-top:2px; font-weight:bold;">
-                                    <span>${s.content}</span>
-                                </div>
-                            `;
-                        } else if (s.type === 'task') {
+                        if (shouldShow) {
+                            const color = s.memberColor || "#eee";
                             filteredBars += `
                                 <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem;">
                                     <span class="shift-name">${s.content}</span>
                                 </div>
                             `;
-                        } else {
-                            const isOff = s.content && !!s.content.match(/休|off|OFF/);
-                            if (isOff) {
-                                filteredBars += `
-                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between;">
-                                        <span class="shift-name">${s.member}</span>
-                                        <span class="shift-time" style="text-decoration: line-through;">${s.content}</span>
-                                    </div>
-                                `;
-                            } else {
-                                filteredBars += `
-                                    <div class="shift-item" style="background-color: ${color}20; color: #333; border-left: 4px solid ${color}; padding: 3px 6px; margin-top: 3px; border-radius: 3px; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-weight:bold;">
-                                        <span class="shift-name">${s.member}</span>
-                                        <span class="shift-time" style="background: #fff; padding: 1px 4px; border-radius: 4px;">${s.content}</span>
-                                    </div>
-                                `;
-                            }
                         }
+                    }
+
+                    if (shouldShow && s.type === 'team_offline') {
+                        filteredBars = `
+                            <div class="shift-item" style="background: repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 5px, #e8e8e8 5px, #e8e8e8 10px); border: 1px solid #ccc; color: #555; padding: 4px; border-radius: 4px; font-size: 0.75rem; text-align: center; margin-top:2px; font-weight:bold;">
+                                <span>${s.content}</span>
+                            </div>
+                        ` + filteredBars;
                     }
                 });
 
                 // 行動解析 (クラス付与)
                 let badgeHtml = "";
+                let highlightCell = false;
+                let dimCell = false;
+
+                const isAvailMorning = (freeCounts.morning >= 3);
+                const isAvailAfternoon = (freeCounts.afternoon >= 3);
+                const isAvailEvening = (freeCounts.evening >= 3);
+                const isAvailFullday = (isAvailMorning && isAvailAfternoon && isAvailEvening);
+
                 if (hasTeamOffline) {
                     cell.classList.add('offline');
-                } else if (offWorkers >= 3) {
-                    // 全員が休み（＝しまねこデザインとして集まれる日）
-                    cell.classList.add('recommended');
-                    badgeHtml = `<span class="badge" style="background:#FFD54F; color:#333; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✨3人日✨</span>`;
+                } else {
+                    // Availability Badges Display
+                    if (isAvailFullday) {
+                        badgeHtml += `<span class="badge" style="background:#FFAB91; color:#fff; font-size: 0.65rem; margin-right: 2px;">終日OK</span>`;
+                    } else if (isAvailAfternoon && isAvailEvening) {
+                        badgeHtml += `<span class="badge" style="background:#FFCC80; color:#333; font-size: 0.65rem; margin-right: 2px;">午後OK</span>`;
+                    } else if (isAvailEvening) {
+                        badgeHtml += `<span class="badge" style="background:#FFE082; color:#333; font-size: 0.65rem; margin-right: 2px;">夕方OK</span>`;
+                    }
+
+                    // Apply Avail Filters
+                    if (availFilter === 'avail-afternoon') {
+                        if (isAvailAfternoon) highlightCell = true;
+                        else dimCell = true;
+                    } else if (availFilter === 'avail-evening') {
+                        if (isAvailEvening) highlightCell = true;
+                        else dimCell = true;
+                    } else if (availFilter === 'avail-fullday') {
+                        if (isAvailFullday) highlightCell = true;
+                        else dimCell = true;
+                    }
+                }
+
+                if (dimCell) {
+                    cell.style.opacity = '0.3';
+                    cell.style.filter = 'grayscale(100%)';
+                }
+                if (highlightCell) {
+                    cell.style.border = '2px solid #FF9800';
+                    cell.style.boxShadow = '0 0 8px rgba(255, 152, 0, 0.4)';
+                    cell.style.backgroundColor = '#FFF8E1';
                 }
 
                 cell.innerHTML = `
-                    <div class="date-header">${d} ${badgeHtml}</div>
+                    <div class="date-header" style="justify-content: flex-start; gap: 4px;">
+                        <div>${d}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:2px;">${badgeHtml}</div>
+                    </div>
                     <div class="calendar-day-content">${filteredBars}</div>
                 `;
                 elCalendarContainer.appendChild(cell);
