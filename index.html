@@ -723,6 +723,26 @@
             <p style="margin-bottom: 8px; font-size: 0.9rem;">テキスト (シフト表 または Notionタスク)</p>
             <textarea id="raw-text-input" placeholder="例: 2/20 田中 10-19&#10;例: 2/25 LPデザイン提出"></textarea>
             <button id="btn-analyze" class="btn">解析してプレビュー</button>
+
+            <!-- Manual shift addition -->
+            <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
+                <p style="font-weight:bold; margin-bottom:8px; color:#555;">✍️ 予定を手動で追加</p>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" id="manual-date" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <select id="manual-member" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                        <option value="ササミ">ササミ</option>
+                        <option value="ツナ">ツナ</option>
+                        <option value="コンブ">コンブ</option>
+                        <option value="全員/〆">全員/〆</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="manual-content" placeholder="内容 (例: 休み, 午後休, 10-18...)"
+                        style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <button class="btn btn-sm" onclick="addManualShift()"
+                        style="white-space:nowrap; background-color:#FF9800; color:white; border:none;">追加</button>
+                </div>
+            </div>
         </section>
 
         <!-- Preview Section -->
@@ -1422,6 +1442,65 @@
             showHome();
         }
 
+        function addManualShift() {
+            const dateStr = document.getElementById('manual-date').value;
+            const member = document.getElementById('manual-member').value;
+            const content = document.getElementById('manual-content').value;
+
+            if (!dateStr || !content) {
+                alert("日付と内容を入力してください。");
+                return;
+            }
+
+            const pd = new Date(dateStr);
+            const y = pd.getFullYear();
+            const m = pd.getMonth() + 1;
+            const d = pd.getDate();
+
+            // Default color logic
+            let color = "#eee";
+            if (member === "ササミ") color = "#F48FB1";
+            if (member === "ツナ") color = "#90CAF9";
+            if (member === "コンブ") color = "#A5D6A7";
+            if (member === "全員/〆") color = "#FF7043";
+
+            const newShift = {
+                id: Date.now() + Math.random(),
+                date: `${m}/${d}`,
+                dateKey: `${y}/${m}/${d}`,
+                member: member,
+                content: content,
+                type: member === "全員/〆" ? 'task' : 'shift',
+                memberColor: color,
+                timestamp: pd.getTime() // Fix local timezone shift issue for sorting
+            };
+
+            appData.shifts.push(newShift);
+
+            // Remove exact duplicates
+            const uniqueShifts = [];
+            const seen = new Set();
+            appData.shifts.forEach(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueShifts.push(s);
+                }
+            });
+            appData.shifts = uniqueShifts;
+            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+
+            currentCalendarMonth = new Date(y, m - 1, 1);
+            alert("予定を手動で追加しました！");
+
+            // Clear inputs
+            document.getElementById('manual-date').value = "";
+            document.getElementById('manual-content').value = "";
+            showHome();
+        }
+
         function applyTrainingSchedules(currentShifts) {
             // コンブの研修日を自動挿入。既に存在する場合は重複させない。
             const newShifts = [...currentShifts];
@@ -1571,8 +1650,8 @@
                         if (isOff) {
                             m = a = e = true;
                         } else if (content.match(/0[\→\>]/) || content.match(/11[\→\>]/)) {
-                            // Midnight/Morning shift finishes early -> free rest of day
-                            m = a = e = true;
+                            // 夜勤明け (0→7など) は午前中は睡眠・休息のため「午後・夕方」のみ空きとする
+                            a = e = true;
                         } else if (content.match(/9-13/)) {
                             // Morning training finishes at 13 -> free afternoon/evening
                             a = e = true;
