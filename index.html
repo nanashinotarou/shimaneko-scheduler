@@ -1537,7 +1537,7 @@
                 const m = parseInt(parts[1]);
                 const d = parseInt(parts[2]);
 
-                const dateKey = `${y} / ${m} / ${d}`;
+                const dateKey = `${y}/${m}/${d}`;
                 const exists = newShifts.find(s => s.member === "コンブ" && s.dateKey === dateKey && s.content.includes('研修'));
 
                 if (!exists) {
@@ -1566,7 +1566,34 @@
                 const response = await fetch(GAS_WEB_APP_URL);
                 if (!response.ok) throw new Error("Network response was not ok");
                 const cloudData = await response.json();
-                appData.shifts = Array.isArray(cloudData) ? cloudData : [];
+                const fetchedShifts = Array.isArray(cloudData) ? cloudData : [];
+
+                // ローカルデータの取得
+                const raw = localStorage.getItem(STORAGE_KEY_DATA);
+                let localShifts = [];
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    localShifts = parsed.shifts || [];
+                }
+
+                // クラウドとローカルをマージ (キー重複排除)
+                const mergedMap = new Map();
+                // 1. まずローカルを入れる
+                localShifts.forEach(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    mergedMap.set(key, s);
+                });
+                // 2. クラウドで上書き or 追加 (最新はクラウドとする)
+                fetchedShifts.forEach(s => {
+                    // クラウド側のdateKeyも念のためスペース除去
+                    if (s.dateKey) s.dateKey = s.dateKey.replace(/\s+/g, '');
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    mergedMap.set(key, s);
+                });
+
+                appData.shifts = Array.from(mergedMap.values());
+                appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
                 localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
             } catch (e) {
                 console.error("Data load error", e);
@@ -1616,7 +1643,7 @@
             if (parts.length < 2) return "2026-02-01";
             const m = parts[0].padStart(2, '0');
             const d = parts[1].padStart(2, '0');
-            return `2026 - ${m} - ${d}`;
+            return `2026-${m}-${d}`;
         }
 
         function parseDateString(str) {
@@ -1664,6 +1691,10 @@
                     // 古いデータのマイグレーション または 空白混入バグの修正
                     const pd = new Date(s.timestamp || parseDateString(s.date));
                     s.dateKey = `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`;
+                }
+                // Migration: remove spaces from old "YYYY / M / D" format
+                if (s.dateKey && s.dateKey.includes(" ")) {
+                    s.dateKey = s.dateKey.replace(/\s+/g, '');
                 }
                 if (!grouped[s.dateKey]) grouped[s.dateKey] = [];
                 grouped[s.dateKey].push(s);
