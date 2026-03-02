@@ -836,6 +836,7 @@
         const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v4"; // Change key for new data format
         const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
         const STORAGE_KEY_API = "shimaneko_scheduler_gemini_key";
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nDhWUpDcEDvGeOBa2XJiLCUe7fdHjHqkSn7xaslggxPpZubD9V_Kuv-IbYpsq-PJ/exec";
 
         let memberConfig = [];
         let geminiApiKey = "";
@@ -1557,7 +1558,6 @@
             return newShifts;
         }
 
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nDhWUpDcEDvGeOBa2XJiLCUe7fdHjHqkSn7xaslggxPpZubD9V_Kuv-IbYpsq-PJ/exec";
 
         async function loadData() {
             try {
