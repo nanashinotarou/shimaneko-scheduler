@@ -833,10 +833,11 @@
             ...[3, 4, 5, 10, 11, 12, 17, 18, 19, 24, 25, 26, 31].map(d => `2026/03/${String(d).padStart(2, '0')}`)
         ];
 
-        const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v4"; // Change key for new data format
+        // v5 stability fix
+        var GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nDhWUpDcEDvGeOBa2XJiLCUe7fdHjHqkSn7xaslggxPpZubD9V_Kuv-IbYpsq-PJ/exec";
+        const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v4";
         const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
         const STORAGE_KEY_API = "shimaneko_scheduler_gemini_key";
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nDhWUpDcEDvGeOBa2XJiLCUe7fdHjHqkSn7xaslggxPpZubD9V_Kuv-IbYpsq-PJ/exec";
 
         let memberConfig = [];
         let geminiApiKey = "";
@@ -1597,6 +1598,7 @@
                 localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
             } catch (e) {
                 console.error("Data load error", e);
+                alert("クラウドデータの取得に失敗しました。オフラインモードで起動します。\n理由: " + e.message);
                 const raw = localStorage.getItem(STORAGE_KEY_DATA);
                 if (raw) {
                     appData = JSON.parse(raw);
