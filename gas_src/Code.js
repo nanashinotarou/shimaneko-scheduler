@@ -67,6 +67,8 @@ function doPost(e) {
       const targetKey = postData.deleteKey;
       if (!targetKey) throw new Error("削除用の deleteKey が指定されていません");
 
+      console.log("Delete Request Received. TargetKey:", targetKey);
+
       const data = sheet.getDataRange().getValues();
       if (data.length > 1) {
         const headers = data[0];
@@ -75,24 +77,48 @@ function doPost(e) {
         const ctIdx = headers.indexOf('content');
         const tpIdx = headers.indexOf('type');
 
+        let foundMatch = false;
+
         // シートの下から上へ検索し、該当する行を削除 (行インデックスは1始まり)
         for (let i = data.length - 1; i > 0; i--) {
-          let dk = data[i][dkIdx];
-          if (dk instanceof Date) {
-            dk = `${dk.getFullYear()}/${dk.getMonth() + 1}/${dk.getDate()}`;
-          } else if (dk) {
-            dk = dk.toString().replace(/\s+/g, '');
+          let rawDk = data[i][dkIdx];
+          let dk = "";
+
+          if (rawDk instanceof Date) {
+            dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
+          } else if (rawDk) {
+            dk = rawDk.toString().replace(/\s+/g, '');
+            // YYYY/0M/0D -> YYYY/M/D にゼロ埋めを削除して統一
+            const parts = dk.split('/');
+            if (parts.length === 3) {
+              const m = parseInt(parts[1], 10);
+              const d = parseInt(parts[2], 10);
+              dk = `${parts[0]}/${m}/${d}`;
+            }
           }
           const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
 
+          // Detailed logging for the last 5 rows to see what's happening
+          if (i > data.length - 6) {
+            console.log(`Checking row ${i + 1}. DK: [${dk}], RowKey: [${rowKey}]`);
+          }
+
           if (rowKey === targetKey) {
+            console.log(`Match found at row ${i + 1}. Deleting.`);
             sheet.deleteRow(i + 1);
+            foundMatch = true;
             return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 1 }))
               .setMimeType(ContentService.MimeType.JSON);
           }
         }
+
+        if (!foundMatch) {
+          console.log("No match found for targetKey:", targetKey);
+          return ContentService.createTextOutput(JSON.stringify({ success: false, deleted: 0, message: "対象データが見つかりません。探したKey: " + targetKey }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
       }
-      return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 0, message: "対象データが見つかりません" }))
+      return ContentService.createTextOutput(JSON.stringify({ success: false, deleted: 0, message: "データが空です" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     // ----------------------------
