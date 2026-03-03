@@ -1702,6 +1702,8 @@
                         // 失敗した場合、ローカルデータをクラウドから再同期して復元
                         await loadData();
                         renderCalendar();
+                    } else {
+                        alert("削除が完了しました！(最新システムで処理済み)");
                     }
                 } catch (e) {
                     console.error("Delete request error", e);
