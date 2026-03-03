@@ -1630,6 +1630,47 @@
             }
         }
 
+        async function confirmDeleteShift(timestamp) {
+            console.log("Confirming delete for timestamp:", timestamp);
+            const shiftToDelete = appData.shifts.find(s => s.timestamp === timestamp || String(s.timestamp) === String(timestamp));
+            if (!shiftToDelete) {
+                console.error("Shift not found for timestamp:", timestamp);
+                return;
+            }
+
+            if (confirm(`以下の予定を削除しますか？\nメンバー: ${shiftToDelete.member}\n内容: ${shiftToDelete.content}`)) {
+
+                // ローカルから即時削除
+                appData.shifts = appData.shifts.filter(s => s.timestamp !== timestamp);
+                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+                renderCalendar();
+
+                // クラウドから削除
+                try {
+                    elLoading.classList.remove('hidden');
+                    elLoadingText.innerText = "予定をクラウドから削除中...";
+                    const response = await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'delete', timestamp: timestamp }),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                    const resJson = await response.json();
+                    if (!resJson.success) {
+                        console.error("Delete failed on server", resJson);
+                        alert("サーバー上での削除に失敗しました: " + (resJson.message || resJson.error || ""));
+                        // 失敗した場合、ローカルデータをクラウドから再同期して復元
+                        await loadData();
+                        renderCalendar();
+                    }
+                } catch (e) {
+                    console.error("Delete request error", e);
+                    alert("削除リクエストに失敗しました: " + e.message);
+                } finally {
+                    elLoading.classList.add('hidden');
+                }
+            }
+        }
+
         function clearData() {
             if (confirm("ブラウザ上のローカルデータを削除しますか？\n（現在、クラウドDBの一括削除機能はありません）")) {
                 localStorage.removeItem(STORAGE_KEY_DATA);
@@ -1637,6 +1678,7 @@
                 renderCalendar();
             }
         }
+
 
         // Helper: "2/20" -> "2026-02-20"
         function parseDateToInputFormat(str) {
@@ -1772,11 +1814,12 @@
 
                             if (isOff) {
                                 filteredBars += `
-                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between;">
+                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;" onclick="confirmDeleteShift(${s.timestamp})">
                                         <span class="shift-name">${s.member}</span>
                                         <span class="shift-time" style="text-decoration: line-through;">休み</span>
                                     </div>
                                 `;
+
                             } else {
                                 // タイムラインバー表現
                                 const barM = m ? '#fff' : color;
@@ -1784,7 +1827,7 @@
                                 const barE = e ? '#fff' : color;
 
                                 filteredBars += `
-                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" onclick="confirmDeleteShift(${s.timestamp})">
                                         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                             <span class="shift-name" style="font-weight:bold;">${s.member}</span>
                                             <span style="font-size: 0.7rem; color: #666; background: #fff; padding: 0 3px; border-radius: 2px;">${content}</span>
@@ -1797,6 +1840,7 @@
                                     </div>
                                 `;
                             }
+
                         }
 
                     } else {
@@ -1804,11 +1848,12 @@
                         if (shouldShow) {
                             const color = s.memberColor || "#eee";
                             filteredBars += `
-                                <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem;">
+                                <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" onclick="confirmDeleteShift(${s.timestamp})">
                                     <span class="shift-name">${s.content}</span>
                                 </div>
                             `;
                         }
+
                     }
 
                     if (shouldShow && s.type === 'team_offline') {

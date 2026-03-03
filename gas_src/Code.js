@@ -61,7 +61,33 @@ function doPost(e) {
     // fetchからのPOST時のリクエストボディを解析
     // (CORSプリフライトを避けるため、フロントエンドからは Content-Type: text/plain で送信される想定)
     const postData = JSON.parse(e.postData.contents);
+
+    // --- 削除アクションの処理 ---
+    if (!Array.isArray(postData) && postData.action === 'delete') {
+      const targetTimestamp = postData.timestamp;
+      if (!targetTimestamp) throw new Error("削除用の timestamp が指定されていません");
+
+      const data = sheet.getDataRange().getValues();
+      if (data.length > 1) {
+        const headers = data[0];
+        const tsIdx = headers.indexOf('timestamp');
+
+        // シートの下から上へ検索し、該当する行を削除 (行インデックスは1始まり)
+        for (let i = data.length - 1; i > 0; i--) {
+          if (data[i][tsIdx] === targetTimestamp || data[i][tsIdx] == targetTimestamp) {
+            sheet.deleteRow(i + 1);
+            return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 1 }))
+              .setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 0, message: "対象データが見つかりません" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    // ----------------------------
+
     const shifts = Array.isArray(postData) ? postData : [postData];
+
 
     // 既存データの読み込み (重複排除のためキーをセット化)
     const existingData = sheet.getDataRange().getValues();
