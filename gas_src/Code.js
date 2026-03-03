@@ -64,17 +64,28 @@ function doPost(e) {
 
     // --- 削除アクションの処理 ---
     if (!Array.isArray(postData) && postData.action === 'delete') {
-      const targetTimestamp = postData.timestamp;
-      if (!targetTimestamp) throw new Error("削除用の timestamp が指定されていません");
+      const targetKey = postData.deleteKey;
+      if (!targetKey) throw new Error("削除用の deleteKey が指定されていません");
 
       const data = sheet.getDataRange().getValues();
       if (data.length > 1) {
         const headers = data[0];
-        const tsIdx = headers.indexOf('timestamp');
+        const dkIdx = headers.indexOf('dateKey');
+        const mbIdx = headers.indexOf('member');
+        const ctIdx = headers.indexOf('content');
+        const tpIdx = headers.indexOf('type');
 
         // シートの下から上へ検索し、該当する行を削除 (行インデックスは1始まり)
         for (let i = data.length - 1; i > 0; i--) {
-          if (data[i][tsIdx] === targetTimestamp || data[i][tsIdx] == targetTimestamp) {
+          let dk = data[i][dkIdx];
+          if (dk instanceof Date) {
+            dk = `${dk.getFullYear()}/${dk.getMonth() + 1}/${dk.getDate()}`;
+          } else if (dk) {
+            dk = dk.toString().replace(/\s+/g, '');
+          }
+          const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
+
+          if (rowKey === targetKey) {
             sheet.deleteRow(i + 1);
             return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 1 }))
               .setMimeType(ContentService.MimeType.JSON);

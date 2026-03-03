@@ -754,6 +754,16 @@
                         style="white-space:nowrap; background-color:#FF9800; color:white; border:none;">追加</button>
                 </div>
             </div>
+
+            <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
+                <p style="font-weight:bold; margin-bottom:8px; color:#555; display:flex; align-items:center;">
+                    <span class="material-icons-round" style="margin-right:4px;">date_range</span> 休み・希望休をまとめて追加
+                </p>
+                <p style="font-size: 0.8rem; color: #666; margin-bottom: 12px; line-height: 1.4;">
+                    カレンダーから複数日を選んで、自分やチームの休み希望などを一括登録できます。</p>
+                <button class="btn btn-secondary" onclick="window.startBotInteraction(true)"
+                    style="width: 100%;">カレンダーを開く</button>
+            </div>
         </section>
 
         <!-- Preview Section -->
@@ -1299,7 +1309,7 @@
                 const div = document.createElement('div');
                 div.className = 'preview-item';
                 div.innerHTML = `
-                    < div class= "preview-meta" >
+                    <div class="preview-meta">
                     <input type="date" style="padding:4px;" value="${ymd}" onchange="window.updateTempDate(${index}, this.value)">
                     <span class="preview-member" style="background:${item.memberColor};">${item.member}</span>
                 </div>
@@ -1321,17 +1331,19 @@
         window.removeItem = (index) => { tempParsedData.splice(index, 1); renderPreview(); };
 
         // --- Bot Interaction & Data Management ---
-        function startBotInteraction() {
+        function startBotInteraction(manualMode = false) {
             botSelectedDates.clear();
             elBotCalendarSelect.innerHTML = '';
 
-            // 抽出されたデータから対象の月と日付範囲を把握
-            let parsedDates = tempParsedData.map(d => parseDateString(d.date));
-            if (parsedDates.length === 0) parsedDates = [Date.now()];
-
-            let targetDateMs = parsedDates.sort((a, b) => a - b)[0];
-            let td = new Date(targetDateMs);
-            currentCalendarMonth = new Date(td.getFullYear(), td.getMonth(), 1);
+            let td;
+            if (!manualMode && tempParsedData && tempParsedData.length > 0) {
+                let parsedDates = tempParsedData.map(d => parseDateString(d.date));
+                let targetDateMs = parsedDates.sort((a, b) => a - b)[0];
+                td = new Date(targetDateMs);
+                currentCalendarMonth = new Date(td.getFullYear(), td.getMonth(), 1);
+            } else {
+                td = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), 1);
+            }
 
             const numDays = new Date(td.getFullYear(), td.getMonth() + 1, 0).getDate();
 
@@ -1358,14 +1370,17 @@
 
         function finishBotInteraction(hasOffline) {
             // 保存する新しいシフトデータ
-            let newShifts = tempParsedData.map(t => {
-                let pd = new Date(parseDateString(t.date));
-                return {
-                    ...t,
-                    dateKey: `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`,
-                    timestamp: pd.getTime()
-                };
-            });
+            let newShifts = [];
+            if (tempParsedData && tempParsedData.length > 0) {
+                newShifts = tempParsedData.map(t => {
+                    let pd = new Date(parseDateString(t.date));
+                    return {
+                        ...t,
+                        dateKey: `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`,
+                        timestamp: pd.getTime()
+                    };
+                });
+            }
 
             // おやすみ希望日の追加
             if (hasOffline) {
@@ -1387,19 +1402,39 @@
                 });
             }
 
-            appData.shifts = [...appData.shifts, ...newShifts];
+            if (newShifts.length > 0) {
+                const seen = new Set();
+                appData.shifts.forEach(s => {
+                    seen.add(`${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, ''));
+                });
+                const uniqueNewShifts = newShifts.filter(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
 
-            // 研修スケジュールの自動反映
-            appData.shifts = applyTrainingSchedules(appData.shifts);
+                appData.shifts = [...appData.shifts, ...uniqueNewShifts];
 
-            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+                // 研修スケジュールの自動反映
+                appData.shifts = applyTrainingSchedules(appData.shifts);
 
-            saveDataToCloud(newShifts).then(() => {
+                appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+                saveDataToCloud(uniqueNewShifts).then(() => {
+                    elInput.value = "";
+                    tempParsedData = [];
+                    elBotModal.classList.remove('active');
+                    toggleSection('home');
+                });
+            } else {
                 elInput.value = "";
+                tempParsedData = [];
                 elBotModal.classList.remove('active');
                 toggleSection('home');
-            });
+            }
         }
+
 
         function injectMarchData() {
             if (!confirm("ツナとササミの3月のスケジュールを追加します。よろしいですか？")) return;
@@ -1630,18 +1665,24 @@
             }
         }
 
-        async function confirmDeleteShift(timestamp) {
-            console.log("Confirming delete for timestamp:", timestamp);
-            const shiftToDelete = appData.shifts.find(s => s.timestamp === timestamp || String(s.timestamp) === String(timestamp));
+        async function confirmDeleteShift(deleteKey) {
+            console.log("Confirming delete for deleteKey:", deleteKey);
+            const shiftToDelete = appData.shifts.find(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                return key === deleteKey;
+            });
             if (!shiftToDelete) {
-                console.error("Shift not found for timestamp:", timestamp);
+                console.error("Shift not found for deleteKey:", deleteKey);
                 return;
             }
 
             if (confirm(`以下の予定を削除しますか？\nメンバー: ${shiftToDelete.member}\n内容: ${shiftToDelete.content}`)) {
 
                 // ローカルから即時削除
-                appData.shifts = appData.shifts.filter(s => s.timestamp !== timestamp);
+                appData.shifts = appData.shifts.filter(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    return key !== deleteKey;
+                });
                 localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
                 renderCalendar();
 
@@ -1651,7 +1692,7 @@
                     elLoadingText.innerText = "予定をクラウドから削除中...";
                     const response = await fetch(GAS_WEB_APP_URL, {
                         method: 'POST',
-                        body: JSON.stringify({ action: 'delete', timestamp: timestamp }),
+                        body: JSON.stringify({ action: 'delete', deleteKey: deleteKey }),
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                     });
                     const resJson = await response.json();
@@ -1670,6 +1711,7 @@
                 }
             }
         }
+
 
         function clearData() {
             if (confirm("ブラウザ上のローカルデータを削除しますか？\n（現在、クラウドDBの一括削除機能はありません）")) {
@@ -1767,6 +1809,7 @@
 
                 dailyData.forEach(s => {
                     let shouldShow = false;
+                    const deleteKey = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
 
                     if (s.type === 'team_offline') {
                         hasTeamOffline = true;
@@ -1814,7 +1857,7 @@
 
                             if (isOff) {
                                 filteredBars += `
-                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;" onclick="confirmDeleteShift(${s.timestamp})">
+                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
                                         <span class="shift-name">${s.member}</span>
                                         <span class="shift-time" style="text-decoration: line-through;">休み</span>
                                     </div>
@@ -1827,7 +1870,7 @@
                                 const barE = e ? '#fff' : color;
 
                                 filteredBars += `
-                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" onclick="confirmDeleteShift(${s.timestamp})">
+                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
                                         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                             <span class="shift-name" style="font-weight:bold;">${s.member}</span>
                                             <span style="font-size: 0.7rem; color: #666; background: #fff; padding: 0 3px; border-radius: 2px;">${content}</span>
@@ -1848,13 +1891,13 @@
                         if (shouldShow) {
                             const color = s.memberColor || "#eee";
                             filteredBars += `
-                                <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" onclick="confirmDeleteShift(${s.timestamp})">
+                                <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
                                     <span class="shift-name">${s.content}</span>
                                 </div>
                             `;
                         }
-
                     }
+
 
                     if (shouldShow && s.type === 'team_offline') {
                         filteredBars = `
