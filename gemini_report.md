@@ -1970,6 +1970,61 @@ function doPost(e) {
             }
         }
 
+        async function updateTaskStatus(deleteKey) {
+            const shift = appData.shifts.find(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                return key === deleteKey;
+            });
+            if (!shift) return;
+
+            const isDone = shift.type === 'task-done';
+
+            if (confirm(`タスク「${shift.content}」の状態を切り替えますか？\n・現在の状態: ${isDone ? "完了 (済み)" : "未完了"}\n\n[OK] でステータスを切り替えます。`)) {
+                const oldKey = deleteKey;
+                // ローカルの削除
+                appData.shifts = appData.shifts.filter(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    return key !== oldKey;
+                });
+
+                // 新しいステータスで追加
+                const newType = isDone ? 'task' : 'task-done';
+                const newContent = isDone ? shift.content.replace(/^✔️\s*/, '') : (shift.content.startsWith('✔️') ? shift.content : '✔️ ' + shift.content);
+                const newShift = { ...shift, type: newType, content: newContent, id: Date.now() + Math.random(), timestamp: Date.now() };
+                appData.shifts.push(newShift);
+                appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+                renderCalendar();
+
+                try {
+                    elLoading.classList.remove('hidden');
+                    elLoadingText.innerText = "タスク状態をクラウドに同期中...";
+                    // 1. Delete old
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'delete', deleteKey: oldKey }),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                    // 2. Add new
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify([newShift]),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                } catch (e) {
+                    console.error("Update request error", e);
+                    alert("更新に失敗しました: " + e.message);
+                } finally {
+                    elLoading.classList.add('hidden');
+                }
+            } else {
+                if (confirm(`このタスクをカレンダーから完全に削除しますか？`)) {
+                    confirmDeleteShift(deleteKey);
+                }
+            }
+        }
+
 
         function clearData() {
             if (confirm("ブラウザ上のローカルデータを削除しますか？\n（現在、クラウドDBの一括削除機能はありません）")) {
@@ -2153,11 +2208,19 @@ function doPost(e) {
                         shouldShow = true; // Task shown always if there
                         if (shouldShow) {
                             const color = s.memberColor || "#eee";
-                            filteredBars += `
-                                <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
-                                    <span class="shift-name">${s.content}</span>
-                                </div>
-                            `;
+                            if (s.type === 'task-done') {
+                                filteredBars += `
+                                    <div class="shift-item task-bar" style="border-left:3px solid #9e9e9e; background:#f5f5f5; color:#9e9e9e; text-decoration:line-through; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" data-delete-key="${deleteKey}" onclick="updateTaskStatus(this.getAttribute('data-delete-key'))">
+                                        <span class="shift-name">${s.content}</span>
+                                    </div>
+                                `;
+                            } else {
+                                filteredBars += `
+                                    <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#FFEBEE; color:#D84315; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer; font-weight:bold;" data-delete-key="${deleteKey}" onclick="updateTaskStatus(this.getAttribute('data-delete-key'))">
+                                        <span class="shift-name">${s.content}</span>
+                                    </div>
+                                `;
+                            }
                         }
                     }
 
@@ -2226,26 +2289,32 @@ function doPost(e) {
                     cell.style.backgroundColor = '#FFF8E1';
                 }
 
+                let dateColorStr = "";
+                let holidayHtml = "";
+                let cellBgStyle = "";
+
+                if (dayOfWeek === 0 || isHoliday) {
+                    dateColorStr = "color: #d32f2f;"; // 日曜・祝日は赤色
+                } else if (dayOfWeek === 6) {
+                    dateColorStr = "color: #1976d2;"; // 土曜は青色
+                }
+
+                if (isHoliday) {
+                    holidayHtml = `<div style="font-size:0.75rem; color:#d32f2f; margin-top:-2px; margin-bottom:4px; font-weight:bold; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;" title="${holidayName}">🎌 ${holidayName}</div>`;
+                    cellBgStyle = "background-color: #FFF0F2; border: 2px solid #FFCDD2; box-shadow: 0 2px 6px rgba(211, 47, 47, 0.08);";
+                }
+
                 const today = new Date();
                 const isToday = (year === today.getFullYear() && month === today.getMonth() && d === today.getDate());
 
                 if (isToday) {
                     cell.style.border = '2px solid #4CAF50';
                     cell.style.boxShadow = '0 0 8px rgba(76, 175, 80, 0.4)';
-                    if (!highlightCell) {
+                    if (!highlightCell && !isHoliday) {
                         cell.style.backgroundColor = '#F1F8E9';
                     }
-                }
-
-                let dateColorStr = "";
-                let holidayHtml = "";
-                if (dayOfWeek === 0 || isHoliday) {
-                    dateColorStr = "color: #d32f2f;"; // 日曜・祝日は赤色
-                } else if (dayOfWeek === 6) {
-                    dateColorStr = "color: #1976d2;"; // 土曜は青色
-                }
-                if (isHoliday) {
-                    holidayHtml = `<div style="font-size:0.65rem; color:#d32f2f; margin-top:-2px; margin-bottom:2px; font-weight:bold; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;" title="${holidayName}">🎌 ${holidayName}</div>`;
+                } else if (isHoliday) {
+                    cell.style.cssText += cellBgStyle; // Apply holiday specific background/border
                 }
 
                 cell.innerHTML = `
