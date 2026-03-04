@@ -886,8 +886,21 @@
         const elBotCalendarSelect = document.getElementById('bot-calendar-select');
 
         // Init
+        let holidaysData = {};
+        async function loadHolidays() {
+            try {
+                const res = await fetch('https://holidays-jp.github.io/api/v1/date.json');
+                if (res.ok) {
+                    holidaysData = await res.json();
+                }
+            } catch (e) {
+                console.error("Failed to load holidays", e);
+            }
+        }
+
         loadConfig();
         (async () => {
+            await loadHolidays();
             await loadData();
             renderCalendar();
         })();
@@ -1798,10 +1811,15 @@
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateKey = `${year}/${month + 1}/${d}`;
+                const apiDateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const dailyData = grouped[dateKey] || [];
+                const holidayName = holidaysData[apiDateKey];
 
                 const cell = document.createElement('div');
                 cell.className = 'calendar-day';
+
+                let dayOfWeek = new Date(year, month, d).getDay();
+                let isHoliday = !!holidayName;
 
                 // 稼働やスケジュールの分析
                 let hasTeamOffline = false;
@@ -1976,11 +1994,23 @@
                     }
                 }
 
+                let dateColorStr = "";
+                let holidayHtml = "";
+                if (dayOfWeek === 0 || isHoliday) {
+                    dateColorStr = "color: #d32f2f;"; // 日曜・祝日は赤色
+                } else if (dayOfWeek === 6) {
+                    dateColorStr = "color: #1976d2;"; // 土曜は青色
+                }
+                if (isHoliday) {
+                    holidayHtml = `<div style="font-size:0.65rem; color:#d32f2f; margin-top:-2px; margin-bottom:2px; font-weight:bold; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;" title="${holidayName}">🎌 ${holidayName}</div>`;
+                }
+
                 cell.innerHTML = `
-                    <div class="date-header" style="justify-content: flex-start; gap: 4px;">
-                        <div>${d}</div>
+                    <div class="date-header" style="justify-content: flex-start; gap: 4px; ${dateColorStr}">
+                        <div style="${dateColorStr}">${d}</div>
                         <div style="display:flex; flex-wrap:wrap; gap:2px;">${badgeHtml}</div>
                     </div>
+                    ${holidayHtml}
                     <div class="calendar-day-content">${filteredBars}</div>
                 `;
                 elCalendarContainer.appendChild(cell);
