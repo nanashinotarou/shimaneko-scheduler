@@ -9,8 +9,8 @@
 - **フロントエンド**: HTML5, Vanilla JavaScript, Vanilla CSS (すべて `index.html` に結合されたSPA構成)
 - **ホスティング**: Cloudflare Pages (`shimaneko-scheduler.pages.dev`)
 - **外部API**: Google Gemini API (`gemini-2.5-flash`) を用いたスクショ画像からの高精度OCR＆シフト抽出
-- **データ保存 (現状)**: ブラウザの `localStorage`
-  - 今後、チーム共有のために Google Spreadsheet + Google Apps Script (GAS) への移行を予定しています。
+- **データ保存 (GASクラウド同期)**: Google Apps Script (GAS)をバックエンド基盤とし、Google Spreadsheet をデータベースとして利用。
+  - フロントエンドとバックエンド間で一意の識別子となる合成キー `deleteKey` (`dateKey-member-content-type`) を利用して、同日同内容の安全かつ確実な削除を実現しています。
 
 ## 3. 主要機能 (Core Features)
 
@@ -30,13 +30,15 @@
 - **テキスト解析**: 手描きのメモやNotionからのコピペテキストをパースしてスケジュール化。
 - **Gemini OCR機能**: スケジュール画像のスクリーンショットをドラッグ＆ドロップ（またはアップロード）すると、ブラウザ上で画像をBase64エンコードし、直接 Gemini API (`gemini-2.5-flash`) へ送信。APIによるChain-of-Thought（表構造の理解）を経てJSON形式でシフトデータを抽出。
 - **手動追加フォーム**: インポート画面内に、任意の日付・メンバー・内容を指定して直接予定を注入するマニュアルエントリー機能。
+- **カレンダーからの一括休み希望登録**: 手動モードでBotモーダルを起動し、カレンダー上の複数日付をタップ＆選択することで、任意のメンバーの休み希望を一括で登録できる直感的なUI。
 
 ### 3.3 その他のUI/UX
 - **使い方ガイド (`guide.html`)**: アプリの機能を図解した CSS モックアップベースの取扱説明書（画像ではなくCSSで描画しているため視認性が高い）。
 - **初期表示**: カレンダーの表示月は、常にデバイスの「当月」がデフォルト。また、「今日」の日付マスは縁取りと背景色で強調表示される。
+- **削除同期エラーハンドリング**: スプレッドシート側のデータ構造とフロントエンドで不整合が生じて削除に失敗した場合、フロントへのアラートとして詳細なターゲットキーを含めたエラーを返し、ゾンビデータの発生を防止する防御的実装。
 
 ## 4. 今後のロードマップ・課題
-- **データ共有基盤の構築**: 現在はローカルストレージにのみ保存されるため、「自分の環境からの編集内容は自分のローカル環境でしか適用されない」状態。これを解決するため、GASを介したスプレッドシート連携による「クラウドデータベース化」が急務。
+- **予定のドラッグ＆ドロップ移動**: シフトやタスクをカレンダー上で直感的に日時変更する機能。
 - **祝日判定**: 土日祝のシフトに対応するため、日本の祝日情報をカレンダーに取り込む仕組み。
 - **Googleカレンダー連携**: ミーティング可能と判断された日時に、Googleカレンダーのイベントを直接登録する機能。
 
@@ -44,7 +46,2518 @@
 - `index.html`: アプリ本体（CSS/JS 含む）
 - `guide.html`: 使い方マニュアル
 - `site_url.txt`: デプロイ先の Cloudflare Pages URL
+- `gas_src/Code.js`: Google Apps Script 用バックエンド処理コード（GET/POSTルーティング、行削除処理、同期処理）
 - `README.md` (Git用)
 
 ---
-*Last Updated: 2026-03-01*
+*Last Updated: 2026-03-04*
+
+
+## 6. ソースコード (Source Code)
+本セクションは、別のAI（Gemini等）が本プロジェクトのコンテキストと実装コードを把握できるようにするための全ソースコードのダンプです。
+
+### gas_src/Code.js
+```javascript
+const SHEET_NAME = 'Shifts';
+
+function getSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    // 最初の行にヘッダーを設定
+    sheet.appendRow(['id', 'date', 'dateKey', 'member', 'content', 'type', 'memberColor', 'timestamp']);
+    // デフォルトのシート1を削除
+    const sheet1 = ss.getSheetByName('シート1') || ss.getSheetByName('Sheet1');
+    if (sheet1) ss.deleteSheet(sheet1);
+  }
+  return sheet;
+}
+
+function doGet(e) {
+  try {
+    const sheet = getSheet();
+    const data = sheet.getDataRange().getValues();
+
+    if (data.length <= 1) {
+      // ヘッダーのみ、またはデータなし
+      return ContentService.createTextOutput(JSON.stringify([]))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    // JSONの配列に変換
+    const result = rows.map(row => {
+      let obj = {};
+      headers.forEach((header, index) => {
+        let val = row[index];
+        // dateKeyが日付オブジェクトとして読み込まれた場合、フロントエンドが期待する YYYY/M/D 形式に戻す
+        if (header === 'dateKey' && val instanceof Date) {
+          val = `${val.getFullYear()}/${val.getMonth() + 1}/${val.getDate()}`;
+        }
+        // timestampが文字列等の場合は数値に変換（念のため）
+        if (header === 'timestamp' && val) {
+          val = Number(val);
+        }
+        obj[header] = val;
+      });
+      return obj;
+    });
+
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const sheet = getSheet();
+
+    // fetchからのPOST時のリクエストボディを解析
+    // (CORSプリフライトを避けるため、フロントエンドからは Content-Type: text/plain で送信される想定)
+    const postData = JSON.parse(e.postData.contents);
+
+    // --- 削除アクションの処理 ---
+    if (!Array.isArray(postData) && postData.action === 'delete') {
+      const targetKey = postData.deleteKey;
+      if (!targetKey) throw new Error("削除用の deleteKey が指定されていません");
+
+      console.log("Delete Request Received. TargetKey:", targetKey);
+
+      const data = sheet.getDataRange().getValues();
+      if (data.length > 1) {
+        const headers = data[0];
+        const dkIdx = headers.indexOf('dateKey');
+        const mbIdx = headers.indexOf('member');
+        const ctIdx = headers.indexOf('content');
+        const tpIdx = headers.indexOf('type');
+
+        let foundMatch = false;
+
+        // シートの下から上へ検索し、該当する行を削除 (行インデックスは1始まり)
+        for (let i = data.length - 1; i > 0; i--) {
+          let rawDk = data[i][dkIdx];
+          let dk = "";
+
+          if (rawDk instanceof Date) {
+            dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
+          } else if (rawDk) {
+            dk = rawDk.toString().replace(/\s+/g, '');
+            // YYYY/0M/0D -> YYYY/M/D にゼロ埋めを削除して統一
+            const parts = dk.split('/');
+            if (parts.length === 3) {
+              const m = parseInt(parts[1], 10);
+              const d = parseInt(parts[2], 10);
+              dk = `${parts[0]}/${m}/${d}`;
+            }
+          }
+          const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
+
+          // Detailed logging for the last 5 rows to see what's happening
+          if (i > data.length - 6) {
+            console.log(`Checking row ${i + 1}. DK: [${dk}], RowKey: [${rowKey}]`);
+          }
+
+          if (rowKey === targetKey) {
+            console.log(`Match found at row ${i + 1}. Deleting.`);
+            sheet.deleteRow(i + 1);
+            foundMatch = true;
+            return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 1 }))
+              .setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+
+        if (!foundMatch) {
+          console.log("No match found for targetKey:", targetKey);
+          return ContentService.createTextOutput(JSON.stringify({ success: false, deleted: 0, message: "対象データが見つかりません。探したKey: " + targetKey }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false, deleted: 0, message: "データが空です" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    // ----------------------------
+
+    const shifts = Array.isArray(postData) ? postData : [postData];
+
+
+    // 既存データの読み込み (重複排除のためキーをセット化)
+    const existingData = sheet.getDataRange().getValues();
+    let existingKeys = new Set();
+    if (existingData.length > 1) {
+      const headers = existingData[0];
+      const dkIdx = headers.indexOf('dateKey');
+      const mbIdx = headers.indexOf('member');
+      const ctIdx = headers.indexOf('content');
+      const tpIdx = headers.indexOf('type');
+
+      existingData.slice(1).forEach(row => {
+        let dk = row[dkIdx];
+        if (dk instanceof Date) {
+          dk = `${dk.getFullYear()}/${dk.getMonth() + 1}/${dk.getDate()}`;
+        }
+        const key = `${dk}-${row[mbIdx]}-${row[ctIdx]}-${row[tpIdx]}`;
+        existingKeys.add(key);
+      });
+    }
+
+    let addedCount = 0;
+    shifts.forEach(shift => {
+      const key = `${shift.dateKey}-${shift.member}-${shift.content}-${shift.type}`;
+
+      // 同じ内容（日付、メンバー、シフト等）が存在しなければ追記
+      if (!existingKeys.has(key)) {
+        const newRow = [
+          shift.id || Date.now() + Math.random(),
+          shift.date || "",
+          shift.dateKey || "",
+          shift.member || "",
+          shift.content || "",
+          shift.type || "shift",
+          shift.memberColor || "#eee",
+          shift.timestamp || Date.now()
+        ];
+        sheet.appendRow(newRow);
+        existingKeys.add(key);
+        addedCount++;
+      }
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, added: addedCount }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+```
+
+### index.html
+```html
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>しまねこスケジューラー</title>
+
+    <!-- Google Fonts: Zen Maru Gothic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Removed Tesseract.js for Gemini API Integration -->
+
+    <style>
+        :root {
+            --color-bg: #FFFAF0;
+            /* フローラルホワイト */
+            --color-text: #8D6E63;
+            /* ブラウン */
+            --color-accent: #F4A460;
+            /* オレンジ */
+            --color-accent-hover: #E09050;
+            --color-white: #FFFFFF;
+            --color-border: #D7CCC8;
+            --radius-main: 16px;
+            --radius-sm: 8px;
+            --shadow-card: 0 4px 12px rgba(141, 110, 99, 0.08);
+
+            /* Default Member Colors */
+            --col-sasami: #F48FB1;
+            --col-kombu: #A5D6A7;
+            --col-tsuna: #90CAF9;
+            --col-task: #FF7043;
+            /* Task Red */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-weight: 700;
+            color: var(--color-text);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        .settings-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Card Style */
+        .card {
+            background: var(--color-white);
+            border-radius: var(--radius-main);
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--color-bg);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            background-color: var(--color-text);
+            color: var(--color-white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn:hover {
+            background-color: var(--color-accent);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 2px solid var(--color-text);
+            color: var(--color-text);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            border-color: var(--color-accent);
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            width: auto;
+        }
+
+        /* Forms */
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        input[type="text"],
+        textarea,
+        input[type="date"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--color-border);
+            background-color: var(--color-bg);
+            font-family: inherit;
+            font-size: 1rem;
+            color: var(--color-text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        input[type="date"]:focus {
+            border-color: var(--color-accent);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--color-border);
+            border-radius: var(--radius-main);
+            padding: 24px;
+            text-align: center;
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            background-color: #FFF3E0;
+            border-color: var(--color-accent);
+        }
+
+        /* Member Config Items */
+        .member-setting-item {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--color-bg);
+        }
+
+        .member-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }
+
+        /* Preview Table */
+        .preview-list {
+            list-style: none;
+            margin-top: 16px;
+        }
+
+        .preview-item {
+            background: var(--color-bg);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            display: grid;
+            grid-template-columns: 80px 1fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .preview-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .preview-member {
+            font-size: 0.8rem;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .preview-delete {
+            color: #d32f2f;
+            cursor: pointer;
+            font-size: 1.2rem;
+            background: none;
+            border: none;
+            padding: 8px;
+        }
+
+        /* Calendar View (Grid) */
+        .calendar-header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            border: 2px solid var(--color-border);
+            background: var(--color-white);
+            color: var(--color-text);
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .filter-btn.active {
+            background: var(--color-text);
+            color: white;
+            border-color: var(--color-text);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .weekday-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: #888;
+            padding: 8px 0;
+        }
+
+        .weekday-header.sun {
+            color: #d32f2f;
+        }
+
+        .weekday-header.sat {
+            color: #1976d2;
+        }
+
+        .calendar-day {
+            background: var(--color-white);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border);
+            min-height: 140px;
+            /* PCでは大きく */
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+        }
+
+        /* スマホ用簡易版リスト表示 */
+        @media (max-width: 768px) {
+            .calendar-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .weekday-header {
+                display: none;
+            }
+
+            .calendar-day {
+                min-height: auto;
+                padding: 16px;
+                flex-direction: column;
+                border-radius: 12px;
+                border: 1px solid var(--color-border);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            }
+
+            .calendar-day.empty-mobile {
+                display: none !important;
+                /* スマホでは空白の日(前月の余白など)は非表示にする */
+            }
+
+            .date-header {
+                font-size: 1.1rem !important;
+                border-bottom: 2px dashed var(--color-border);
+                padding-bottom: 8px;
+                margin-bottom: 8px;
+            }
+        }
+
+        .calendar-day.offline {
+            background-color: #f5f5f5;
+            opacity: 0.8;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
+        }
+
+        .calendar-day.recommended {
+            border: 2px solid #FFD54F;
+            background-color: #FFFDE7;
+            box-shadow: 0 4px 12px rgba(255, 213, 79, 0.3);
+        }
+
+        .calendar-day.collaboration {
+            border: 2px solid #E1BEE7;
+            background-color: #F3E5F5;
+        }
+
+        .date-header {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #555;
+        }
+
+        .date-header span.badge {
+            font-size: 0.6rem;
+            padding: 2px 4px;
+            border-radius: 4px;
+            margin-left: 4px;
+            background: #FFD54F;
+            color: #424242;
+            vertical-align: top;
+        }
+
+        .calendar-day-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .calendar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .date-row {
+            background: var(--color-white);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            gap: 12px;
+        }
+
+        .date-header {
+            text-align: center;
+            border-right: 2px solid var(--color-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .date-num {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .date-day {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .shift-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .shift-bar {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .task-bar {
+            border-left: 4px solid var(--col-task);
+            background: #FFEBEE;
+            color: #D84315;
+            font-weight: bold;
+        }
+
+        .shift-name {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .shift-time {
+            font-size: 0.75rem;
+        }
+
+        /* Matching View */
+        .matching-item {
+            background: #E8F5E9;
+            border: 1px solid #C8E6C9;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            color: #2E7D32;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Bot Interaction Modal */
+        .bot-modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--color-bg);
+            border-top: 4px solid var(--col-kombu);
+            padding: 24px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 900;
+            display: flex;
+            flex-direction: column;
+            max-height: 80vh;
+        }
+
+        .bot-modal.active {
+            transform: translateY(0);
+        }
+
+        .bot-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .bot-avatar {
+            font-size: 2.5rem;
+            background: var(--color-white);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .bot-bubble {
+            background: var(--color-white);
+            padding: 16px;
+            border-radius: 0 16px 16px 16px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            font-weight: bold;
+            flex: 1;
+            position: relative;
+        }
+
+        .bot-bubble::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -10px;
+            border-top: 15px solid var(--color-white);
+            border-left: 15px solid transparent;
+        }
+
+        .bot-content {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--color-white);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            border: 1px solid var(--color-border);
+        }
+
+        .bot-date-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .bot-date-btn {
+            background: var(--color-bg);
+            border: 2px solid var(--color-border);
+            padding: 12px 4px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+        }
+
+        .bot-date-btn.selected {
+            background: var(--col-task);
+            color: white;
+            border-color: var(--col-task);
+        }
+
+        .bot-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 250, 240, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .tab-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 20px;
+            border: none;
+            background: #EEE;
+            cursor: pointer;
+            font-weight: bold;
+            color: #888;
+        }
+
+        .tab-btn.active {
+            background: var(--color-accent);
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container" id="main-container">
+        <header class="settings-container">
+            <h1 style="cursor: pointer;" onclick="showHome()">🐈 しまねこスケジューラー</h1>
+        </header>
+
+        <section id="home-section">
+            <div class="card settings-container" style="padding: 16px; max-width: 1400px; margin-bottom: 16px;">
+                <div class="calendar-header-actions" style="flex-direction: column; align-items: flex-start;">
+                    <div class="filter-group">
+                        <button class="filter-btn active" onclick="toggleFilter('all')" id="filter-all">全て表示</button>
+                        <button class="filter-btn" onclick="toggleFilter('sasami')" id="filter-sasami">ササミ</button>
+                        <button class="filter-btn" onclick="toggleFilter('tsuna')" id="filter-tsuna">ツナ</button>
+                        <button class="filter-btn" onclick="toggleFilter('kombu')" id="filter-kombu">コンブ</button>
+                        <button class="filter-btn" onclick="toggleFilter('offline')" id="filter-offline">休業日</button>
+                    </div>
+                    <div class="filter-group" style="margin-top: 8px;">
+                        <span
+                            style="font-size: 0.8rem; color: #666; font-weight: bold; margin-right: 8px;">ミーティング可能:</span>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-all')"
+                            id="filter-avail-all">すべて</button>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-afternoon')"
+                            id="filter-avail-afternoon">午後(13~) 3人OK</button>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-evening')"
+                            id="filter-avail-evening">夕方(16~) 3人OK</button>
+                        <button class="filter-btn" onclick="toggleAvailFilter('avail-fullday')"
+                            id="filter-avail-fullday">終日 3人OK</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm" onclick="toggleSection('import')">+ インポート</button>
+                        <button class="btn btn-sm btn-secondary" onclick="toggleSection('settings')">⚙️ 設定</button>
+                        <a href="guide.html" class="btn btn-sm" style="background-color: #4CAF50;">📖
+                            使い方ガイド</a>
+                    </div>
+                    <button class="btn btn-sm btn-secondary" onclick="clearData()">クリア</button>
+                </div>
+            </div>
+
+            <div id="calendar-view">
+                <!-- 曜日見出し -->
+                <div class="calendar-grid" style="margin-bottom: 8px;" id="weekday-header-row">
+                    <div class="weekday-header sun">日</div>
+                    <div class="weekday-header">月</div>
+                    <div class="weekday-header">火</div>
+                    <div class="weekday-header">水</div>
+                    <div class="weekday-header">木</div>
+                    <div class="weekday-header">金</div>
+                    <div class="weekday-header sat">土</div>
+                </div>
+                <div id="calendar-container" class="calendar-grid"></div>
+            </div>
+
+            <div id="calendar-legend"
+                style="margin-top: 16px; font-size: 0.8rem; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <div><span
+                        style="display:inline-block; width:12px; height:12px; background:#FFFDE7; border: 2px solid #FFD54F;"></span>
+                    稼働おすすめ日</div>
+                <div><span
+                        style="display:inline-block; width:12px; height:12px; background:#F3E5F5; border: 2px solid #E1BEE7;"></span>
+                    3人共通予定あり</div>
+                <div><span style="display:inline-block; width:12px; height:12px; background:#f5f5f5;"></span> しまねこ休業日
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2>メンバー設定</h2>
+                <button class="btn btn-sm btn-secondary" onclick="saveSettings()">保存して閉じる</button>
+            </div>
+
+            <div class="card" style="background-color: #E8F5E9; border-color: #A5D6A7; margin-bottom: 24px;">
+                <h3 style="color: #2E7D32; margin-bottom: 8px;">☁️ ローカルデータをクラウドへ同期</h3>
+                <p style="font-size: 0.85rem; margin-bottom: 12px; color: #388E3C;">
+                    このブラウザ（PCやスマホ）に保存されている既存のスケジュールデータを、クラウドのデータベース（スプレッドシート）へ一括で送信し、他のメンバーと共有できるようにします。<br>※既に同期済みのデータは重複しません。
+                </p>
+                <button class="btn" onclick="syncLocalToCloud()"
+                    style="background-color: #4CAF50; color: white; border: none;">⬆️ 今すぐクラウドへ同期する</button>
+            </div>
+
+            <div class="card" style="background-color: #FFF3E0; border-color: #FFCC80; margin-bottom: 24px;">
+                <h3 style="color: #E65100; margin-bottom: 8px;">🌸 期間限定：3月のシフト一括登録</h3>
+                <p style="font-size: 0.85rem; margin-bottom: 12px; color: #E65100;">
+                    ツナ（カニ屋）とササミ（カニ屋＆リンクモア）の3月分のスケジュールをワンクリックで追加します。<br>既存のデータは保持されたまま追加されます。</p>
+                <button class="btn" onclick="injectMarchData()"
+                    style="background-color: #FF9800; color: white; border: none;">✅ 3月分を反映する</button>
+            </div>
+
+            <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px dashed var(--color-border);">
+                <div class="member-header">
+                    <span>🤖 Gemini API キー</span>
+                </div>
+                <label style="font-size:0.8rem;">画像の高精度解析に使用します（ローカルのみ保存・外部送信なし）</label>
+                <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (APIキーを入力)">
+                <p style="font-size:0.75rem; color:#888; margin-top:4px;">Google AI Studioで取得したAPIキーを設定してください。</p>
+            </div>
+
+            <p style="font-size:0.9rem; margin-bottom:16px;">
+                シフト表に書かれている名前（キーワード）を設定してください。<br>
+                ※カンマ区切りで複数指定できます。
+            </p>
+
+            <div id="settings-list"></div>
+        </section>
+
+        <!-- Import Section -->
+        <section id="import-section" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2>インポート</h2>
+                <button class="btn btn-sm btn-secondary" onclick="showHome()">閉じる</button>
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+                <p>📷 画像をここにドロップ<br>(またはクリックして選択)<br><span
+                        style="font-size: 0.8rem; color: #aaa;">OCRでテキストを読み取ります</span></p>
+                <input type="file" id="file-input" accept="image/*" style="display: none;">
+            </div>
+
+            <p style="margin-bottom: 8px; font-size: 0.9rem;">テキスト (シフト表 または Notionタスク)</p>
+            <textarea id="raw-text-input" placeholder="例: 2/20 田中 10-19&#10;例: 2/25 LPデザイン提出"></textarea>
+            <button id="btn-analyze" class="btn">解析してプレビュー</button>
+
+            <!-- Manual shift addition -->
+            <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
+                <p style="font-weight:bold; margin-bottom:8px; color:#555;">✍️ 予定を手動で追加</p>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" id="manual-date" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <select id="manual-member" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                        <option value="ササミ">ササミ</option>
+                        <option value="ツナ">ツナ</option>
+                        <option value="コンブ">コンブ</option>
+                        <option value="全員/〆">全員/〆</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="manual-content" placeholder="内容 (例: 休み, 午後休, 10-18...)"
+                        style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <button class="btn btn-sm" onclick="addManualShift()"
+                        style="white-space:nowrap; background-color:#FF9800; color:white; border:none;">追加</button>
+                </div>
+            </div>
+
+            <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
+                <p style="font-weight:bold; margin-bottom:8px; color:#555; display:flex; align-items:center;">
+                    <span class="material-icons-round" style="margin-right:4px;">date_range</span> 休み・希望休をまとめて追加
+                </p>
+                <p style="font-size: 0.8rem; color: #666; margin-bottom: 12px; line-height: 1.4;">
+                    カレンダーから複数日を選んで、自分やチームの休み希望などを一括登録できます。</p>
+                <button class="btn btn-secondary" onclick="window.startBotInteraction(true)"
+                    style="width: 100%;">カレンダーを開く</button>
+            </div>
+        </section>
+
+        <!-- Preview Section -->
+        <section id="preview-section" class="card hidden">
+            <h2>解析結果の確認</h2>
+            <p style="margin-bottom: 16px; font-size: 0.9rem;">
+                読み取りミスがあれば日付や内容を修正してください。
+            </p>
+
+            <div id="preview-list" class="preview-list"></div>
+
+            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <button id="btn-cancel" class="btn btn-secondary" onclick="toggleSection('import')">やり直し</button>
+                <button id="btn-save" class="btn" onclick="startBotInteraction()">これでOK (次へ)</button>
+            </div>
+        </section>
+
+        <!-- Bot Interaction Modal -->
+        <div id="bot-modal" class="bot-modal">
+            <div class="bot-header">
+                <div class="bot-avatar">🐈‍⬛</div>
+                <div class="bot-bubble" id="bot-message">
+                    OK！シフトは見込めたよ。<br>じゃあ最後に、今月「しまねこデザイン」を終日お休み(オフ)にしたい日があれば教えてね！チームのスケジュールの参考にするよ。
+                </div>
+            </div>
+            <div class="bot-content">
+                <div style="margin-bottom: 12px; text-align: center;">
+                    <label style="font-size:0.85rem; font-weight:bold;">誰の希望？</label>
+                    <select id="bot-requester-select"
+                        style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-family:inherit;">
+                        <option value="ササミ">ササミ</option>
+                        <option value="ツナ">ツナ</option>
+                        <option value="コンブ">コンブ</option>
+                        <option value="自分たち">自分たち（全員）</option>
+                    </select>
+                </div>
+                <p style="font-size:0.8rem; color:#666; text-align:center;">（休業日としてマークしたい日を全てタップしてください）</p>
+                <div id="bot-calendar-select" class="bot-date-grid">
+                    <!-- Date buttons generated by JS -->
+                </div>
+            </div>
+            <div class="bot-actions">
+                <button class="btn btn-secondary" onclick="finishBotInteraction(false)">休業日なしで完了</button>
+                <button class="btn" onclick="finishBotInteraction(true)"
+                    style="background:var(--col-kombu); color:var(--color-text);">決定して完了</button>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div style="font-size: 2rem;">🐈</div>
+            <p id="loading-text" style="font-weight: bold; margin-top: 16px;">読み込み中...</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Global Error Handler
+        window.onerror = function (msg, url, line) {
+            alert("エラーが発生しました: " + msg + "\\n行: " + line);
+            return false;
+        };
+
+        // Config & Data
+        const DEFAULT_MEMBERS = [
+            { id: "sasami", name: "ササミ", color: "#F48FB1", keywords: "ササミ,佐々木,Sasaki" },
+            { id: "kombu", name: "コンブ", color: "#A5D6A7", keywords: "コンブ,昆布,ボブ,田中" },
+            { id: "tsuna", name: "ツナ", color: "#90CAF9", keywords: "ツナ,綱,Tsuna,佐藤" }
+        ];
+
+        // 研修対象日（自動的にコンブの9-13時が入る日）
+        // 研修まとめサイトのカリキュラム指定日に合わせる
+        const TRAINING_DATES = [
+            // 2月 (TikTok Marketing)
+            ...[3, 4, 5, 10, 12, 13, 17, 18, 19, 24, 25, 26, 27].map(d => `2026/02/${String(d).padStart(2, '0')}`),
+            // 3月 (Generative AI & Prompt)
+            ...[3, 4, 5, 10, 11, 12, 17, 18, 19, 24, 25, 26, 31].map(d => `2026/03/${String(d).padStart(2, '0')}`)
+        ];
+
+        // v5 stability fix
+        var GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nDhWUpDcEDvGeOBa2XJiLCUe7fdHjHqkSn7xaslggxPpZubD9V_Kuv-IbYpsq-PJ/exec";
+        const STORAGE_KEY_DATA = "shimaneko_scheduler_data_v4";
+        const STORAGE_KEY_CONFIG = "shimaneko_scheduler_config_v1";
+        const STORAGE_KEY_API = "shimaneko_scheduler_gemini_key";
+
+        let memberConfig = [];
+        let geminiApiKey = "";
+        let appData = { shifts: [] };
+        let tempParsedData = [];
+
+        let activeFilters = {
+            sasami: true, tsuna: true, kombu: true, offline: true
+        };
+        let availFilter = 'avail-all'; // 'avail-all', 'avail-afternoon', 'avail-evening', 'avail-fullday'
+
+        let botSelectedDates = new Set();
+        let _initDate = new Date();
+        _initDate.setDate(1);
+        _initDate.setHours(0, 0, 0, 0);
+        let currentCalendarMonth = _initDate;
+        // Valid DOM Elements check
+        const elHomeSection = document.getElementById('home-section');
+        const elSettingsSection = document.getElementById('settings-section');
+        const elImportSection = document.getElementById('import-section');
+        const elPreviewSection = document.getElementById('preview-section');
+
+        // View DOMs
+        const elCalendarView = document.getElementById('calendar-view');
+        const elCalendarContainer = document.getElementById('calendar-container');
+
+        const elInput = document.getElementById('raw-text-input');
+        const elPreviewList = document.getElementById('preview-list');
+
+        const elLoading = document.getElementById('loading-overlay');
+        const elLoadingText = document.getElementById('loading-text');
+        const elDropZone = document.getElementById('drop-zone');
+        const elFileInput = document.getElementById('file-input');
+
+        const elBotModal = document.getElementById('bot-modal');
+        const elBotCalendarSelect = document.getElementById('bot-calendar-select');
+
+        // Init
+        loadConfig();
+        (async () => {
+            await loadData();
+            renderCalendar();
+        })();
+
+        // Events
+        document.getElementById('btn-analyze').addEventListener('click', analyzeText);
+
+        elDropZone.addEventListener('click', () => elFileInput.click());
+
+        elDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elDropZone.classList.add('dragover');
+        });
+
+        elDropZone.addEventListener('dragleave', () => {
+            elDropZone.classList.remove('dragover');
+        });
+
+        elDropZone.addEventListener('drop', handleImageDrop);
+        elFileInput.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
+
+        // Navigation & Tabs
+        function toggleSection(mode) {
+            elHomeSection.classList.add('hidden');
+            elSettingsSection.classList.add('hidden');
+            elImportSection.classList.add('hidden');
+            elPreviewSection.classList.add('hidden');
+            elLoading.classList.add('hidden');
+            elBotModal.classList.remove('active');
+
+            if (mode === 'home') {
+                elHomeSection.classList.remove('hidden');
+                renderCalendar();
+            } else if (mode === 'settings') {
+                renderSettings();
+                elSettingsSection.classList.remove('hidden');
+            } else if (mode === 'import') {
+                elImportSection.classList.remove('hidden');
+            } else if (mode === 'preview') {
+                elPreviewSection.classList.remove('hidden');
+            }
+        }
+
+        function toggleFilter(key) {
+            if (key === 'all') {
+                const isActive = document.getElementById('filter-all').classList.contains('active');
+                const newVal = !isActive;
+                document.getElementById('filter-all').classList.toggle('active', newVal);
+                activeFilters.sasami = newVal; activeFilters.tsuna = newVal;
+                activeFilters.kombu = newVal; activeFilters.offline = newVal;
+                ['sasami', 'tsuna', 'kombu', 'offline'].forEach(k => {
+                    document.getElementById('filter-' + k).classList.toggle('active', newVal);
+                });
+            } else {
+                activeFilters[key] = !activeFilters[key];
+                document.getElementById('filter-' + key).classList.toggle('active', activeFilters[key]);
+                // allボタンの同期
+                const allActive = activeFilters.sasami && activeFilters.tsuna && activeFilters.kombu && activeFilters.offline;
+                document.getElementById('filter-all').classList.toggle('active', allActive);
+            }
+            renderCalendar();
+        }
+
+        function toggleAvailFilter(filterId) {
+            availFilter = filterId;
+            ['avail-all', 'avail-afternoon', 'avail-evening', 'avail-fullday'].forEach(id => {
+                document.getElementById('filter-' + id).classList.remove('active');
+            });
+            document.getElementById('filter-' + filterId).classList.add('active');
+            renderCalendar();
+        }
+
+        window.toggleSection = toggleSection;
+        window.showHome = () => toggleSection('home');
+        window.clearData = clearData;
+        window.saveSettings = saveSettings;
+        window.startBotInteraction = startBotInteraction;
+
+        // --- Settings Logic ---
+        function loadConfig() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
+                if (raw) {
+                    memberConfig = JSON.parse(raw);
+                    // Remove mito from existing local storage config
+                    memberConfig = memberConfig.filter(m => m.id !== "mito");
+                } else {
+                    memberConfig = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+                }
+
+                geminiApiKey = localStorage.getItem(STORAGE_KEY_API) || "";
+            } catch (e) {
+                console.error("Config load error", e);
+                memberConfig = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+            }
+        }
+
+        function renderSettings() {
+            const list = document.getElementById('settings-list');
+            list.innerHTML = '';
+
+            document.getElementById('setting-gemini-key').value = geminiApiKey;
+
+            memberConfig.forEach((m, idx) => {
+                const div = document.createElement('div');
+                div.className = 'member-setting-item';
+                div.innerHTML = `
+                <div class="member-header">
+                    <span class="color-dot" style="background:${m.color}"></span>
+                    <span>${m.name}</span>
+                </div>
+                <label style="font-size:0.8rem;">検索キーワード (カンマ区切り)</label>
+                <input type="text" id="setting-keywords-${idx}" value="${m.keywords}">
+            `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveSettings() {
+            memberConfig.forEach((m, idx) => {
+                const el = document.getElementById(`setting-keywords-${idx}`);
+                if (el) m.keywords = el.value;
+            });
+            localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(memberConfig));
+
+            geminiApiKey = document.getElementById('setting-gemini-key').value.trim();
+            localStorage.setItem(STORAGE_KEY_API, geminiApiKey);
+
+            alert("設定を保存しました。");
+            toggleSection('home');
+        }
+
+        // --- Image to Base64 ---
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data URL prefix
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        // --- OCR Logic ---
+        async function handleImageDrop(e) {
+            e.preventDefault();
+            elDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleImageFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        async function handleImageFile(file) {
+            if (!file) return;
+
+            if (!geminiApiKey) {
+                alert("設定画面からGemini APIキーを設定してください。画像解析には本物のAIを利用します。");
+                toggleSection('settings');
+                return;
+            }
+
+            elLoading.classList.remove('hidden');
+            elLoadingText.innerText = "Gemini AIが画像を解析中...\\n(これには数秒かかります)";
+
+            try {
+                const base64Image = await fileToBase64(file);
+
+                // Construct prompt dynamically with member configurations
+                const memberNamesStr = memberConfig.map(m => `「${m.name}」（キーワード: ${m.keywords}）`).join("、");
+
+                const promptText = `
+画像から以下のスタッフ（${memberNamesStr}）のシフト情報のみを抽出し、最終的にJSON配列で出力してください。
+
+【超重要：手順（Step-by-Step 分析）】
+複雑な表組みの読み間違いを防ぐため、いきなりJSONを出力しないでください。
+まず以下のステップで「思考プロセス」をテキストで書き出してください。
+1. 画像がどのような表構造か（日付が横向きに並んでいるか、縦向きか。名前はどこにあるか）を分析する。
+2. 表の中から対象となる指定キーワードの名前がどこに（どの行、またはどの列に）存在するかを特定する。対象者の名前がない場合は「対象者なし」と明記する。
+3. 特定した行列の【1日〜末日】まで目で追い、対応するセルの中身（時間、文字、記号、または空欄か）を1つずつ確認するプロセスを記述する。
+
+その後、思考プロセスの最後に必ず \`\`\`json と \`\`\` で囲んで、抽出したJSON配列を出力してください。
+
+【超重要：抽出ルール】
+1. 指定されたメンバーのデータのみを抽出し、画像にいないメンバーのデータは絶対に作成しないこと（幻覚の禁止）。
+2. 画像全体に名前がない個人用シフト画面の場合のみ、すべてのシフトを最初の指定メンバーのものとして扱うこと。
+3. "早番", "遅番", "10-19", "4.5", "11→", "0→7", "0→" などの文字・数字は見たまま正確に抽出すること。
+4. 赤ペンなどの丸印（〇）や手書きスタンプが押されている場合、その印の中や近くにある文字・数字（『0→7』『0→』など）を絶対にそのまま抽出すること（単なる「出勤」としない）。
+5. 記号（印鑑、〇印のみ）で文字がない場合は「出勤」とする。
+6. セル内に "休", "off", "OFF", "公休" がある場合、表がない場所、または対象者の欄が【完全に空欄（ただの空白）】の場合は、必ず「休み」とする。
+
+出力形式の例:
+(ここに思考プロセスを記述)
+\`\`\`json
+[
+  { "date": "2/2", "member": "ササミ", "content": "休み" },
+  { "date": "2/3", "member": "ササミ", "content": "10-18" },
+  { "date": "2/4", "member": "コンブ", "content": "0→7" }
+]
+\`\`\`
+`;
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptText },
+                                {
+                                    inlineData: {
+                                        mimeType: file.type || 'image/jpeg',
+                                        data: base64Image
+                                    }
+                                }
+                            ]
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                let resultText = data.candidates[0].content.parts[0].text;
+
+                // Extract JSON block even if there is reasoning text before it
+                const jsonMatch = resultText.match(/\`\`\`json\n([\s\S]*?)\n\`\`\`/);
+                if (jsonMatch) {
+                    resultText = jsonMatch[1].trim();
+                } else {
+                    // Fallback
+                    resultText = resultText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+                    const firstBracket = resultText.indexOf('[');
+                    const lastBracket = resultText.lastIndexOf(']');
+                    if (firstBracket !== -1 && lastBracket !== -1) {
+                        resultText = resultText.substring(firstBracket, lastBracket + 1);
+                    }
+                }
+
+                try {
+                    const parsedJson = JSON.parse(resultText);
+
+                    // Add mapping data for colors
+                    tempParsedData = parsedJson.map(item => {
+                        const mconf = memberConfig.find(m => m.name === item.member);
+                        return {
+                            id: Date.now() + Math.random(),
+                            date: item.date,
+                            member: item.member,
+                            memberColor: mconf ? mconf.color : '#CCC',
+                            type: 'shift',
+                            content: item.content
+                        };
+                    });
+
+                    // Show in textarea as fallback text, although we skip analyzeText
+                    elInput.value = JSON.stringify(tempParsedData, null, 2);
+
+                    elLoading.classList.add('hidden');
+                    renderPreview();
+                    toggleSection('preview');
+
+                } catch (jsonErr) {
+                    console.error("JSON Parsing Error from Gemini output:", resultText);
+                    alert("Geminiからの応答形式が不正でした。もう一度お試しください。");
+                    elLoading.classList.add('hidden');
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Gemini画像解析に失敗しました: " + err);
+                elLoading.classList.add('hidden');
+            }
+        }
+
+        // --- Parsing Logic (Shift + Task) ---
+        function analyzeText() {
+            const text = elInput.value.trim();
+            if (!text) {
+                alert("テキストを入力してください");
+                return;
+            }
+
+            const lines = text.split(/\r?\n/);
+            tempParsedData = [];
+            let currentDate = null;
+
+            const dateRegex = /(\d{1,2})\s*[\/\月]\s*(\d{1,2})/;
+
+            // 【機能追加】テキストの上部からヘッダー（列の並び順）を特定する
+            let detectedHeaders = [];
+            for (let i = 0; i < Math.min(lines.length, 10); i++) {
+                let foundMembers = [];
+                memberConfig.forEach(memberData => {
+                    const keywords = memberData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                    const matchedKeyword = keywords.find(k => lines[i].includes(k));
+                    if (matchedKeyword) {
+                        foundMembers.push({ member: memberData, pos: lines[i].indexOf(matchedKeyword) });
+                    }
+                });
+                if (foundMembers.length > 0) {
+                    foundMembers.sort((a, b) => a.pos - b.pos);
+                    detectedHeaders = foundMembers.map(f => f.member);
+                    break;
+                }
+            }
+
+            // 【機能追加】ノイズ除去用フィルター（シフト時間に頻出するパターンのみ抽出）
+            // "0→7", "11→" などの矢印表記も許容するように修正
+            const shiftPattern = /(休|off|OFF|\d{1,2}[:.～〜\-\→\>]\d{1,2}|\d{1,2}[\→\>]|\d+h?)/g;
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                // Date Detection
+                const dateMatch = trimmed.match(dateRegex);
+                let lineDate = null;
+                if (dateMatch) {
+                    lineDate = `${dateMatch[1]} / ${dateMatch[2]}`;
+                    currentDate = lineDate;
+                }
+
+                // A) リスト形式チェック (名前が直接含まれているか)
+                let isShift = false;
+                memberConfig.forEach(memberData => {
+                    const keywords = memberData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                    const matchedKeyword = keywords.find(k => trimmed.includes(k));
+
+                    if (matchedKeyword) {
+                        isShift = true;
+                        let content = trimmed
+                            .replace(matchedKeyword, "")
+                            .replace(dateRegex, "")
+                            .trim();
+                        content = content.replace(/^[:：,、\s]+|[:：,、\s]+$/g, '');
+
+                        if (content.match(/休|OFF|off/)) content = "休み";
+
+                        tempParsedData.push({
+                            id: Date.now() + Math.random(),
+                            date: currentDate || "2/1", // fallback
+                            member: memberData.name,
+                            memberColor: memberData.color,
+                            type: 'shift',
+                            content: content || "要確認"
+                        });
+                    }
+                });
+
+                // B) 表形式データの推測 (名前がないが日付があり、ヘッダーが特定できている場合)
+                if (!isShift && lineDate && detectedHeaders.length > 0) {
+                    let restText = trimmed.replace(dateRegex, "").trim();
+                    let tokens = restText.match(shiftPattern);
+
+                    if (tokens && tokens.length > 0) {
+                        isShift = true; // トークンが見つかればシフト行と判定
+                        tokens.forEach((token, idx) => {
+                            if (idx < detectedHeaders.length) {
+                                let content = token;
+                                if (content.match(/休|OFF|off/)) content = "休み";
+
+                                tempParsedData.push({
+                                    id: Date.now() + Math.random(),
+                                    date: lineDate,
+                                    member: detectedHeaders[idx].name,
+                                    memberColor: detectedHeaders[idx].color,
+                                    type: 'shift',
+                                    content: content
+                                });
+                            }
+                        });
+                    }
+                }
+
+                // C) タスク判定 (シフトではなく日付があるテキスト)
+                if (!isShift && lineDate) {
+                    let taskName = trimmed.replace(dateRegex, "").trim();
+                    taskName = taskName.replace(/^[:：,、\s]+|[:：,、\s]+$/g, '');
+                    // ゴミ文字だけの行は除外
+                    if (taskName && taskName.replace(/[^\w\sぁ-んァ-ヶ亜-熙]/g, '').length > 0) {
+                        tempParsedData.push({
+                            id: Date.now() + Math.random(),
+                            date: lineDate,
+                            member: "全員/〆",
+                            memberColor: "#FF7043", // Task color
+                            type: 'task',
+                            content: "〆 " + taskName
+                        });
+                    }
+                }
+            });
+
+            if (tempParsedData.length === 0) {
+                // Fallback for user entering manual row
+                tempParsedData.push({
+                    id: Date.now(),
+                    date: "2/1",
+                    member: "ササミ",
+                    memberColor: "#F48FB1",
+                    type: 'shift',
+                    content: ""
+                });
+                alert("データを認識できませんでした。手入力用の行を追加しました。");
+            }
+
+            renderPreview();
+            toggleSection('preview');
+        }
+
+        function renderPreview() {
+            elPreviewList.innerHTML = '';
+            tempParsedData.forEach((item, index) => {
+                // Convert M/D to YYYY-MM-DD for input[type=date]
+                const ymd = parseDateToInputFormat(item.date);
+
+                const div = document.createElement('div');
+                div.className = 'preview-item';
+                div.innerHTML = `
+                    <div class="preview-meta">
+                    <input type="date" style="padding:4px;" value="${ymd}" onchange="window.updateTempDate(${index}, this.value)">
+                    <span class="preview-member" style="background:${item.memberColor};">${item.member}</span>
+                </div>
+                <input type="text" value="${item.content}" onchange="window.updateTempContent(${index}, this.value)">
+                <button class="preview-delete" onclick="window.removeItem(${index})">×</button>
+            `;
+                elPreviewList.appendChild(div);
+            });
+        }
+
+        window.updateTempDate = (index, ymd) => {
+            // ymd is 2026-02-20
+            if (ymd) {
+                const parts = ymd.split('-');
+                tempParsedData[index].date = `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+            }
+        };
+        window.updateTempContent = (index, val) => { tempParsedData[index].content = val; };
+        window.removeItem = (index) => { tempParsedData.splice(index, 1); renderPreview(); };
+
+        // --- Bot Interaction & Data Management ---
+        function startBotInteraction(manualMode = false) {
+            botSelectedDates.clear();
+            elBotCalendarSelect.innerHTML = '';
+
+            let td;
+            if (!manualMode && tempParsedData && tempParsedData.length > 0) {
+                let parsedDates = tempParsedData.map(d => parseDateString(d.date));
+                let targetDateMs = parsedDates.sort((a, b) => a - b)[0];
+                td = new Date(targetDateMs);
+                currentCalendarMonth = new Date(td.getFullYear(), td.getMonth(), 1);
+            } else {
+                td = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), 1);
+            }
+
+            const numDays = new Date(td.getFullYear(), td.getMonth() + 1, 0).getDate();
+
+            for (let i = 1; i <= numDays; i++) {
+                const btn = document.createElement('div');
+                btn.className = 'bot-date-btn';
+                btn.innerText = `${td.getMonth() + 1}/${i}`;
+                const dateKey = `${td.getFullYear()}/${td.getMonth() + 1}/${i}`;
+
+                btn.onclick = () => {
+                    if (botSelectedDates.has(dateKey)) {
+                        botSelectedDates.delete(dateKey);
+                        btn.classList.remove('selected');
+                    } else {
+                        botSelectedDates.add(dateKey);
+                        btn.classList.add('selected');
+                    }
+                };
+                elBotCalendarSelect.appendChild(btn);
+            }
+
+            elBotModal.classList.add('active');
+        }
+
+        function finishBotInteraction(hasOffline) {
+            // 保存する新しいシフトデータ
+            let newShifts = [];
+            if (tempParsedData && tempParsedData.length > 0) {
+                newShifts = tempParsedData.map(t => {
+                    let pd = new Date(parseDateString(t.date));
+                    return {
+                        ...t,
+                        dateKey: `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`,
+                        timestamp: pd.getTime()
+                    };
+                });
+            }
+
+            // おやすみ希望日の追加
+            if (hasOffline) {
+                const requesterElement = document.getElementById('bot-requester-select');
+                const requester = requesterElement ? requesterElement.value : "しまねこデザイン";
+
+                botSelectedDates.forEach(dateKey => {
+                    const parts = dateKey.split('/');
+                    newShifts.push({
+                        id: Date.now() + Math.random(),
+                        date: `${parts[1]}/${parts[2]}`,
+                        dateKey: dateKey,
+                        member: requester,
+                        memberColor: "#f5f5f5",
+                        type: "team_offline",
+                        content: requester === "自分たち" ? "休業日" : `${requester}希望休`,
+                        timestamp: new Date(parts[0], parts[1] - 1, parts[2]).getTime()
+                    });
+                });
+            }
+
+            if (newShifts.length > 0) {
+                const seen = new Set();
+                appData.shifts.forEach(s => {
+                    seen.add(`${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, ''));
+                });
+                const uniqueNewShifts = newShifts.filter(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+
+                appData.shifts = [...appData.shifts, ...uniqueNewShifts];
+
+                // 研修スケジュールの自動反映
+                appData.shifts = applyTrainingSchedules(appData.shifts);
+
+                appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+                saveDataToCloud(uniqueNewShifts).then(() => {
+                    elInput.value = "";
+                    tempParsedData = [];
+                    elBotModal.classList.remove('active');
+                    toggleSection('home');
+                });
+            } else {
+                elInput.value = "";
+                tempParsedData = [];
+                elBotModal.classList.remove('active');
+                toggleSection('home');
+            }
+        }
+
+
+        function injectMarchData() {
+            if (!confirm("ツナとササミの3月のスケジュールを追加します。よろしいですか？")) return;
+
+            const newShifts = [
+                // ツナ カニ屋: 出勤
+                ...[3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 23, 24, 25, 26, 27, 30, 31].map(d => ({
+                    id: Date.now() + Math.random(),
+                    date: `2026/03/${String(d).padStart(2, '0')}`,
+                    dateKey: `2026/3/${d}`,
+                    member: "ツナ", content: "出勤", type: "shift",
+                    memberColor: "#90CAF9",
+                    timestamp: new Date().getTime()
+                })),
+
+                // ササミ カニ屋: 出勤
+                ...[1, 8, 15, 21, 22, 29].map(d => ({
+                    id: Date.now() + Math.random(),
+                    date: `2026/03/${String(d).padStart(2, '0')}`,
+                    dateKey: `2026/3/${d}`,
+                    member: "ササミ", content: "カニ屋 8:30-16", type: "shift",
+                    memberColor: "#F48FB1",
+                    timestamp: new Date().getTime()
+                })),
+
+                // ササミ 野菜屋さん: 0→7
+                ...[2, 3, 5, 6, 7, 9, 10, 12, 13, 14, 16, 17, 19, 21, 23, 24, 26, 27, 28, 30, 31].map(d => ({
+                    id: Date.now() + Math.random(),
+                    date: `2026/03/${String(d).padStart(2, '0')}`,
+                    dateKey: `2026/3/${d}`,
+                    member: "ササミ", content: "0→7", type: "shift",
+                    memberColor: "#F48FB1",
+                    timestamp: new Date().getTime()
+                }))
+            ];
+
+            // 既存のデータに追加
+            appData.shifts.push(...newShifts);
+
+            // データを一意にする (同日・同内容の重複排除)
+            const uniqueShifts = [];
+            const seen = new Set();
+            appData.shifts.forEach(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueShifts.push(s);
+                }
+            });
+            appData.shifts = uniqueShifts;
+            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+            saveDataToCloud(newShifts).then(() => {
+                // カレンダーを3月に移動させて再描画
+                currentCalendarMonth = new Date(2026, 2, 1); // 3月
+                alert("3月のスケジュールを反映しました！");
+                showHome();
+            });
+        }
+
+        function syncLocalToCloud() {
+            if (!confirm("現在このブラウザに保存されているすべてのスケジュールデータをクラウドへ同期します。よろしいですか？")) return;
+            if (!appData.shifts || appData.shifts.length === 0) {
+                alert("同期するローカルデータがありません。");
+                return;
+            }
+            saveDataToCloud(appData.shifts).then(() => {
+                alert(`計 ${appData.shifts.length} 件のデータをクラウドへ送信しました！\n（既に存在しているデータは重複登録されません）`);
+            });
+        }
+
+        function addManualShift() {
+            const dateStr = document.getElementById('manual-date').value;
+            const member = document.getElementById('manual-member').value;
+            const content = document.getElementById('manual-content').value;
+
+            if (!dateStr || !content) {
+                alert("日付と内容を入力してください。");
+                return;
+            }
+
+            const pd = new Date(dateStr);
+            const y = pd.getFullYear();
+            const m = pd.getMonth() + 1;
+            const d = pd.getDate();
+
+            // Default color logic
+            let color = "#eee";
+            if (member === "ササミ") color = "#F48FB1";
+            if (member === "ツナ") color = "#90CAF9";
+            if (member === "コンブ") color = "#A5D6A7";
+            if (member === "全員/〆") color = "#FF7043";
+
+            const newShift = {
+                id: Date.now() + Math.random(),
+                date: `${m}/${d}`,
+                dateKey: `${y}/${m}/${d}`,
+                member: member,
+                content: content,
+                type: member === "全員/〆" ? 'task' : 'shift',
+                memberColor: color,
+                timestamp: pd.getTime() // Fix local timezone shift issue for sorting
+            };
+
+            appData.shifts.push(newShift);
+
+            // Remove exact duplicates
+            const uniqueShifts = [];
+            const seen = new Set();
+            appData.shifts.forEach(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueShifts.push(s);
+                }
+            });
+            appData.shifts = uniqueShifts;
+            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+            saveDataToCloud([newShift]).then(() => {
+                currentCalendarMonth = new Date(y, m - 1, 1);
+                alert("予定を手動で追加しました！");
+
+                // Clear inputs
+                document.getElementById('manual-date').value = "";
+                document.getElementById('manual-content').value = "";
+                showHome();
+            });
+        }
+
+        function applyTrainingSchedules(currentShifts) {
+            // コンブの研修日を自動挿入。既に存在する場合は重複させない。
+            const newShifts = [...currentShifts];
+            TRAINING_DATES.forEach(td => {
+                const parts = td.split('/');
+                const y = parseInt(parts[0]);
+                const m = parseInt(parts[1]);
+                const d = parseInt(parts[2]);
+
+                const dateKey = `${y}/${m}/${d}`;
+                const exists = newShifts.find(s => s.member === "コンブ" && s.dateKey === dateKey && s.content.includes('研修'));
+
+                if (!exists) {
+                    newShifts.push({
+                        id: Date.now() + Math.random(),
+                        date: `${m} / ${d}`,
+                        dateKey: dateKey,
+                        member: "コンブ",
+                        memberColor: "#A5D6A7",
+                        type: "shift",
+                        content: "9-13(研修)",
+                        timestamp: new Date(y, m - 1, d).getTime(),
+                        isAuto: true
+                    });
+                }
+            });
+            return newShifts;
+        }
+
+
+        async function loadData() {
+            try {
+                elLoading.classList.remove('hidden');
+                elLoadingText.innerText = "クラウドからカレンダーを同期中...";
+                const response = await fetch(GAS_WEB_APP_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                const cloudData = await response.json();
+                const fetchedShifts = Array.isArray(cloudData) ? cloudData : [];
+
+                // ローカルデータの取得
+                const raw = localStorage.getItem(STORAGE_KEY_DATA);
+                let localShifts = [];
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    localShifts = parsed.shifts || [];
+                }
+
+                // クラウドとローカルをマージ (キー重複排除)
+                const mergedMap = new Map();
+                // 1. まずローカルを入れる
+                localShifts.forEach(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    mergedMap.set(key, s);
+                });
+                // 2. クラウドで上書き or 追加 (最新はクラウドとする)
+                fetchedShifts.forEach(s => {
+                    // クラウド側のdateKeyも念のためスペース除去
+                    if (s.dateKey) s.dateKey = s.dateKey.replace(/\s+/g, '');
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    mergedMap.set(key, s);
+                });
+
+                appData.shifts = Array.from(mergedMap.values());
+                appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+
+                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+            } catch (e) {
+                console.error("Data load error", e);
+                alert("クラウドデータの取得に失敗しました。オフラインモードで起動します。\n理由: " + e.message);
+                const raw = localStorage.getItem(STORAGE_KEY_DATA);
+                if (raw) {
+                    appData = JSON.parse(raw);
+                    console.log("Loaded offline data from local storage.");
+                } else {
+                    appData = { shifts: [] };
+                }
+            } finally {
+                elLoading.classList.add('hidden');
+            }
+        }
+
+        async function saveDataToCloud(shiftsToPush) {
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+            if (!shiftsToPush || shiftsToPush.length === 0) return;
+            try {
+                elLoading.classList.remove('hidden');
+                elLoadingText.innerText = "クラウドへカレンダーを保存中...";
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(shiftsToPush),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                await response.json();
+            } catch (e) {
+                console.error("Cloud save failed", e);
+            } finally {
+                elLoading.classList.add('hidden');
+            }
+        }
+
+        async function confirmDeleteShift(deleteKey) {
+            console.log("Confirming delete for deleteKey:", deleteKey);
+            const shiftToDelete = appData.shifts.find(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                return key === deleteKey;
+            });
+            if (!shiftToDelete) {
+                console.error("Shift not found for deleteKey:", deleteKey);
+                return;
+            }
+
+            if (confirm(`以下の予定を削除しますか？\nメンバー: ${shiftToDelete.member}\n内容: ${shiftToDelete.content}`)) {
+
+                // ローカルから即時削除
+                appData.shifts = appData.shifts.filter(s => {
+                    const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                    return key !== deleteKey;
+                });
+                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+                renderCalendar();
+
+                // クラウドから削除
+                try {
+                    elLoading.classList.remove('hidden');
+                    elLoadingText.innerText = "予定をクラウドから削除中...";
+                    const response = await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'delete', deleteKey: deleteKey }),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                    const resJson = await response.json();
+                    if (!resJson.success) {
+                        console.error("Delete failed on server", resJson);
+                        alert("サーバー上での削除に失敗しました: " + (resJson.message || resJson.error || ""));
+                        // 失敗した場合、ローカルデータをクラウドから再同期して復元
+                        await loadData();
+                        renderCalendar();
+                    } else {
+                        alert("削除が完了しました！(最新システムで処理済み)");
+                    }
+                } catch (e) {
+                    console.error("Delete request error", e);
+                    alert("削除リクエストに失敗しました: " + e.message);
+                } finally {
+                    elLoading.classList.add('hidden');
+                }
+            }
+        }
+
+
+        function clearData() {
+            if (confirm("ブラウザ上のローカルデータを削除しますか？\n（現在、クラウドDBの一括削除機能はありません）")) {
+                localStorage.removeItem(STORAGE_KEY_DATA);
+                appData = { shifts: [] };
+                renderCalendar();
+            }
+        }
+
+
+        // Helper: "2/20" -> "2026-02-20"
+        function parseDateToInputFormat(str) {
+            if (!str) return "2026-02-01";
+            const parts = str.split(/[\/\月]/);
+            if (parts.length < 2) return "2026-02-01";
+            const m = parts[0].padStart(2, '0');
+            const d = parts[1].padStart(2, '0');
+            return `2026-${m}-${d}`;
+        }
+
+        function parseDateString(str) {
+            if (!str) return Date.now();
+            const parts = str.split(/[\/\月]/);
+            if (parts.length < 2) return Date.now();
+            const m = parseInt(parts[0]);
+            const d = parseInt(parts[1]);
+            return new Date(2026, m - 1, d).getTime();
+        }
+
+        // --- New Full Grid Calendar Rendering ---
+        function changeMonth(offset) {
+            currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + offset, 1);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            elCalendarContainer.innerHTML = '';
+
+            const year = currentCalendarMonth.getFullYear();
+            const month = currentCalendarMonth.getMonth();
+            const firstDay = new Date(year, month, 1).getDay(); // 0(Sun) - 6(Sat)
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Header for Month
+            const monthHeader = document.getElementById('calendar-month-title');
+            if (monthHeader) {
+                monthHeader.innerText = `${year}年 ${month + 1} 月`;
+            } else {
+                const headerDiv = document.createElement('div');
+                headerDiv.style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;";
+                headerDiv.innerHTML = `
+                    <button class="btn btn-sm btn-secondary" onclick="changeMonth(-1)">＜ 先月</button>
+                    <h2 id="calendar-month-title" style="margin:0;">${year}年 ${month + 1}月</h2>
+                    <button class="btn btn-sm btn-secondary" onclick="changeMonth(1)">翌月 ＞</button>
+                `;
+                elCalendarView.insertBefore(headerDiv, elCalendarView.firstChild);
+            }
+
+            // データのグループ化 (dateKey単位へ)
+            const grouped = {};
+            appData.shifts.forEach(s => {
+                if (!s.dateKey || s.dateKey.includes(" ")) {
+                    // 古いデータのマイグレーション または 空白混入バグの修正
+                    const pd = new Date(s.timestamp || parseDateString(s.date));
+                    s.dateKey = `${pd.getFullYear()}/${pd.getMonth() + 1}/${pd.getDate()}`;
+                }
+                // Migration: remove spaces from old "YYYY / M / D" format
+                if (s.dateKey && s.dateKey.includes(" ")) {
+                    s.dateKey = s.dateKey.replace(/\s+/g, '');
+                }
+                if (!grouped[s.dateKey]) grouped[s.dateKey] = [];
+                grouped[s.dateKey].push(s);
+            });
+
+            // 前月の空白セル
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-day empty-mobile';
+                emptyCell.style.opacity = '0.3';
+                elCalendarContainer.appendChild(emptyCell);
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${year}/${month + 1}/${d}`;
+                const dailyData = grouped[dateKey] || [];
+
+                const cell = document.createElement('div');
+                cell.className = 'calendar-day';
+
+                // 稼働やスケジュールの分析
+                let hasTeamOffline = false;
+                let filteredBars = "";
+                let freeCounts = { morning: 0, afternoon: 0, evening: 0 };
+                let trackedShiftCount = 0;
+
+                dailyData.forEach(s => {
+                    let shouldShow = false;
+                    const deleteKey = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+
+                    if (s.type === 'team_offline') {
+                        hasTeamOffline = true;
+                        if (activeFilters.offline) shouldShow = true;
+                    }
+                    else if (s.type === 'shift') {
+                        trackedShiftCount++;
+
+                        let m = false, a = false, e = false;
+                        const content = s.content || "";
+                        const isOff = !!content.match(/休|off|OFF|公休/);
+
+                        if (isOff) {
+                            m = a = e = true;
+                        } else if (content.match(/0[\→\>]/) || content.match(/11[\→\>]/)) {
+                            // 夜勤明け (0→7など) は午前中は睡眠・休息のため「午後・夕方」のみ空きとする
+                            a = e = true;
+                        } else if (content.match(/9-13/)) {
+                            // Morning training finishes at 13 -> free afternoon/evening
+                            a = e = true;
+                        } else if (content.match(/早番/)) {
+                            a = e = true;
+                        }
+                        else {
+                            // Standard work -> free evening
+                            e = true;
+                        }
+
+                        if (m) freeCounts.morning++;
+                        if (a) freeCounts.afternoon++;
+                        if (e) freeCounts.evening++;
+
+                        const mConf = memberConfig.find(m => m.name === s.member);
+                        if (mConf) {
+                            if (mConf.id === 'sasami' && activeFilters.sasami) shouldShow = true;
+                            if (mConf.id === 'tsuna' && activeFilters.tsuna) shouldShow = true;
+                            if (mConf.id === 'kombu' && activeFilters.kombu) shouldShow = true;
+                        } else if (activeFilters.all || activeFilters.offline) {
+                            shouldShow = true; // Other tasks/unknown
+                        }
+
+                        // バーの生成 (表示対象の場合のみ)
+                        if (shouldShow) {
+                            const color = s.memberColor || "#eee";
+
+                            if (isOff) {
+                                filteredBars += `
+                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
+                                        <span class="shift-name">${s.member}</span>
+                                        <span class="shift-time" style="text-decoration: line-through;">休み</span>
+                                    </div>
+                                `;
+
+                            } else {
+                                // タイムラインバー表現
+                                const barM = m ? '#fff' : color;
+                                const barA = a ? '#fff' : color;
+                                const barE = e ? '#fff' : color;
+
+                                filteredBars += `
+                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
+                                        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                            <span class="shift-name" style="font-weight:bold;">${s.member}</span>
+                                            <span style="font-size: 0.7rem; color: #666; background: #fff; padding: 0 3px; border-radius: 2px;">${content}</span>
+                                        </div>
+                                        <div style="display:flex; height: 6px; border-radius: 3px; overflow: hidden; border: 1px solid ${color}50;">
+                                            <div style="flex:1; background:${barM}; border-right:1px solid #fff;"></div>
+                                            <div style="flex:1; background:${barA}; border-right:1px solid #fff;"></div>
+                                            <div style="flex:1; background:${barE};"></div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+
+                        }
+
+                    } else {
+                        shouldShow = true; // Task shown always if there
+                        if (shouldShow) {
+                            const color = s.memberColor || "#eee";
+                            filteredBars += `
+                                <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#fff; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
+                                    <span class="shift-name">${s.content}</span>
+                                </div>
+                            `;
+                        }
+                    }
+
+
+                    if (shouldShow && s.type === 'team_offline') {
+                        filteredBars = `
+                            <div class="shift-item" style="background: repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 5px, #e8e8e8 5px, #e8e8e8 10px); border: 1px solid #ccc; color: #555; padding: 4px; border-radius: 4px; font-size: 0.75rem; text-align: center; margin-top:2px; font-weight:bold;">
+                                <span>${s.content}</span>
+                            </div>
+                        ` + filteredBars;
+                    }
+                });
+
+                // ★追加: データに存在しないメンバーは「休み（終日空き）」として扱う
+                let presentMembers = dailyData.map(s => s.member);
+                memberConfig.forEach(m => {
+                    if (!presentMembers.includes(m.name)) {
+                        freeCounts.morning++;
+                        freeCounts.afternoon++;
+                        freeCounts.evening++;
+                    }
+                });
+
+                // 行動解析 (クラス付与)
+                let badgeHtml = "";
+                let highlightCell = false;
+                let dimCell = false;
+
+                const isAvailMorning = (freeCounts.morning >= 3);
+                const isAvailAfternoon = (freeCounts.afternoon >= 3);
+                const isAvailEvening = (freeCounts.evening >= 3);
+                const isAvailFullday = (isAvailMorning && isAvailAfternoon && isAvailEvening);
+
+                if (hasTeamOffline) {
+                    cell.classList.add('offline');
+                } else {
+                    // Availability Badges Display
+                    if (isAvailFullday) {
+                        badgeHtml += `<span class="badge" style="background:#FFAB91; color:#fff; font-size: 0.65rem; margin-right: 2px;">終日OK</span> `;
+                    } else if (isAvailAfternoon && isAvailEvening) {
+                        badgeHtml += `<span class="badge" style="background:#FFCC80; color:#333; font-size: 0.65rem; margin-right: 2px;">午後OK</span> `;
+                    } else if (isAvailEvening) {
+                        badgeHtml += `<span class="badge" style="background:#FFE082; color:#333; font-size: 0.65rem; margin-right: 2px;">夕方OK</span> `;
+                    }
+
+                    // Apply Avail Filters
+                    if (availFilter === 'avail-afternoon') {
+                        if (isAvailAfternoon) highlightCell = true;
+                        else dimCell = true;
+                    } else if (availFilter === 'avail-evening') {
+                        if (isAvailEvening) highlightCell = true;
+                        else dimCell = true;
+                    } else if (availFilter === 'avail-fullday') {
+                        if (isAvailFullday) highlightCell = true;
+                        else dimCell = true;
+                    }
+                }
+
+                if (dimCell) {
+                    cell.style.opacity = '0.3';
+                    cell.style.filter = 'grayscale(100%)';
+                }
+                if (highlightCell) {
+                    cell.style.border = '2px solid #FF9800';
+                    cell.style.boxShadow = '0 0 8px rgba(255, 152, 0, 0.4)';
+                    cell.style.backgroundColor = '#FFF8E1';
+                }
+
+                const today = new Date();
+                const isToday = (year === today.getFullYear() && month === today.getMonth() && d === today.getDate());
+
+                if (isToday) {
+                    cell.style.border = '2px solid #4CAF50';
+                    cell.style.boxShadow = '0 0 8px rgba(76, 175, 80, 0.4)';
+                    if (!highlightCell) {
+                        cell.style.backgroundColor = '#F1F8E9';
+                    }
+                }
+
+                cell.innerHTML = `
+                    <div class="date-header" style="justify-content: flex-start; gap: 4px;">
+                        <div>${d}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:2px;">${badgeHtml}</div>
+                    </div>
+                    <div class="calendar-day-content">${filteredBars}</div>
+                `;
+                elCalendarContainer.appendChild(cell);
+            }
+        }
+    </script>
+
+</body>
+
+</html>
+```
+
+### guide.html
+```html
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>しまねこスケジューラー - 使い方ガイド</title>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #FFFBF0;
+            --color-text: #5D4037;
+            --color-primary: #FFB74D;
+            --color-secondary: #FFCC80;
+            --color-accent: #FF9800;
+            --color-border: #FFE0B2;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'M PLUS Rounded 1c', "Hiragino Maru Gothic ProN", sans-serif;
+            color: var(--color-text);
+        }
+
+        body {
+            background-color: var(--color-bg);
+            line-height: 1.6;
+            padding: 24px 16px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--color-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .guide-section {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 2px solid var(--color-border);
+            box-shadow: 0 4px 12px rgba(255, 183, 77, 0.1);
+        }
+
+        .guide-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            border-bottom: 2px dashed var(--color-border);
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .guide-step {
+            margin-bottom: 24px;
+        }
+
+        .guide-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--color-accent);
+        }
+
+        .step-desc {
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            color: #666;
+        }
+
+        .mock-ui {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .mock-calendar-cell {
+            background: white;
+            border: 2px solid #FF9800;
+            border-radius: var(--radius-sm);
+            padding: 8px;
+            width: 200px;
+            box-shadow: 0 0 8px rgba(255, 152, 0, 0.2);
+            background-color: #FFF8E1;
+        }
+
+        .mock-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        .badge-full {
+            background: #FFAB91;
+            color: white;
+        }
+
+        .badge-afternoon {
+            background: #FFCC80;
+            color: #333;
+        }
+
+        .badge-evening {
+            background: #FFE082;
+            color: #333;
+        }
+
+        .mock-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #ccc;
+            margin-top: 4px;
+        }
+
+        .mock-bar>div {
+            flex: 1;
+            border-right: 1px solid white;
+        }
+
+        .mock-bar>div:last-child {
+            border-right: none;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--color-primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 100px;
+            text-decoration: none;
+            font-weight: bold;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            background-color: var(--color-accent);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: var(--color-accent);
+            border: 2px solid var(--color-accent);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background-color: var(--color-bg);
+        }
+
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 32px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>📖 しまねこスケジューラー 使い方ガイド</h1>
+        <p style="font-size: 0.9rem; margin-top: 8px;">アプリの便利な機能を図解でご案内します</p>
+    </header>
+
+    <div class="guide-section">
+        <h2>① カレンダーの見方（空き時間の判別）</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                誰がいつ空いているか、ミーティングがいつできるかが一目でわかるように、1日を「午前・午後・夕方以降」の3つに分けて自動判定しています。
+            </p>
+            <div class="mock-ui" style="display:flex; justify-content:center;">
+                <div class="mock-calendar-cell">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:bold;">25</span>
+                        <div>
+                            <span class="mock-badge badge-afternoon">午後OK</span>
+                        </div>
+                    </div>
+
+                    <div
+                        style="background:#F48FB120; border-radius:4px; padding:4px; margin-bottom:4px; font-size:0.8rem;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <b>ササミ</b> <span
+                                style="font-size:0.7rem; background:white; padding:0 2px; border-radius:2px;">0→7</span>
+                        </div>
+                        <div class="mock-bar">
+                            <div style="background:white;"></div> <!-- 午前寝てる -->
+                            <div style="background:#F48FB1;"></div> <!-- 午後OK -->
+                            <div style="background:#F48FB1;"></div> <!-- 夕方OK -->
+                        </div>
+                    </div>
+
+                    <div style="background:#A5D6A720; border-radius:4px; padding:4px; font-size:0.8rem;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <b>コンブ</b> <span
+                                style="font-size:0.7rem; background:white; padding:0 2px; border-radius:2px;">9-13(研修)</span>
+                        </div>
+                        <div class="mock-bar">
+                            <div style="background:white;"></div> <!-- 午前NG -->
+                            <div style="background:#A5D6A7;"></div> <!-- 午後OK -->
+                            <div style="background:#A5D6A7;"></div> <!-- 夕方OK -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.85rem; margin-top:8px; color:#666;">
+                ※ 色のついたバーが「空いている時間」です。白抜きは「仕事中（または睡眠中）」を表します。<br>
+                ※ ササミさん（0→7）の場合、夜勤明けのため午前中は「睡眠」として判定し、午後・夕方を空き時間とみなします。
+            </p>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <h2>② 予定を登録する（画像読み込み）</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                スマホで見ているシフト表のスクリーンショット（スクショ）から、自動でシフトを抜き出してカレンダーに入力できます。
+            </p>
+            <div class="mock-ui">
+                <p style="margin-bottom:8px;"><b>1. トップ画面の「＋ インポート」を押す</b></p>
+                <button class="btn" style="padding: 4px 16px; font-size:0.9rem; pointer-events: none;">＋ インポート</button>
+
+                <p style="margin:16px 0 8px;"><b>2. カメラ枠に画像をドロップ（スマホならタップしてアルバムから選択）</b></p>
+                <div
+                    style="border:2px dashed #ccc; background:white; padding:24px; text-align:center; border-radius:8px;">
+                    📷 画像をここにドロップ<br><span style="font-size:0.8rem; color:#aaa;">スマホの場合はタップして写真を選択</span>
+                </div>
+
+                <p style="margin:16px 0 8px;"><b>3. AIが文字を解析！間違っていれば修正して保存</b></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <h2>③ 予定を手動で追加・修正する</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                AI解析を使わずに、特定の日付の予定を1つずつピンポイントで追加したり、「ミーティング予定」を入れることもできます。
+            </p>
+            <div class="mock-ui">
+                <p style="font-weight:bold; margin-bottom:8px; color:#555;">✍️ 予定を手動で追加 (インポート画面内)</p>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" value="2026-03-25"
+                        style="padding:6px; border:1px solid #ccc; border-radius:4px; flex:1;" readonly>
+                    <select style="padding:6px; border:1px solid #ccc; border-radius:4px; flex:1;" disabled>
+                        <option>全員/〆</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" value="しまねこミーティング"
+                        style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px;" readonly>
+                    <button class="btn btn-sm"
+                        style="flex:1; background-color:#FF9800; color:white; border:none; padding:8px;"
+                        disabled>追加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <h2>④ 絞り込みフィルターを活用する</h2>
+        <div class="guide-step">
+            <p class="step-desc">
+                「今月、夕方・夜なら全員あつまれそうな日はないかな？」といった時に、ボタン1つでカレンダーを絞り込めます。
+            </p>
+            <div class="mock-ui" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                <button
+                    style="border: 1px solid #ccc; background: white; padding: 4px 12px; border-radius: 100px; font-size: 0.85rem;">すべて</button>
+                <button
+                    style="border: 2px solid #FF9800; background: #FFF8E1; padding: 4px 12px; border-radius: 100px; font-size: 0.85rem; font-weight:bold; color:#FF9800;">午後(13~)
+                    3人OK</button>
+                <button
+                    style="border: 1px solid #ccc; background: white; padding: 4px 12px; border-radius: 100px; font-size: 0.85rem;">夕方(16~)
+                    3人OK</button>
+            </div>
+            <p style="font-size:0.85rem; margin-top:8px; color:#666;">
+                該当する日以外はグレーアウト（白黒表示）されるため、すぐに予定を立てられる日が見つかります。
+            </p>
+        </div>
+    </div>
+
+    <div class="nav-buttons">
+        <a href="index.html" class="btn">カレンダーに戻る</a>
+    </div>
+
+</body>
+
+</html>
+```
+
