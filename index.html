@@ -922,6 +922,13 @@
                     <label>📝 内容</label>
                     <input type="text" id="edit-content" placeholder="例: 10-18, 休み, 展示14時～...">
                 </div>
+                <div class="form-group" id="edit-task-status-group"
+                    style="display: none; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="edit-task-done"
+                        style="width: 18px; height: 18px; accent-color: var(--col-task);">
+                    <label for="edit-task-done" style="margin-bottom: 0; font-size: 0.95rem; cursor: pointer;">✅
+                        完了済みとしてマーク</label>
+                </div>
                 <div class="edit-modal-actions">
                     <button class="btn btn-danger btn-sm" onclick="deleteFromEditModal()" style="flex:0.6;">🗑
                         削除</button>
@@ -2087,13 +2094,13 @@
                             const color = s.memberColor || "#eee";
                             if (s.type === 'task-done') {
                                 filteredBars += `
-                                    <div class="shift-item task-bar" style="border-left:3px solid #9e9e9e; background:#f5f5f5; color:#9e9e9e; text-decoration:line-through; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" data-delete-key="${deleteKey}" onclick="updateTaskStatus(this.getAttribute('data-delete-key'))">
+                                    <div class="shift-item task-bar" style="border-left:3px solid #9e9e9e; background:#f5f5f5; color:#9e9e9e; text-decoration:line-through; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer;" data-delete-key="${deleteKey}" onclick="openEditModal(this.getAttribute('data-delete-key'))">
                                         <span class="shift-name">${s.content}</span>
                                     </div>
                                 `;
                             } else {
                                 filteredBars += `
-                                    <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#FFEBEE; color:#D84315; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer; font-weight:bold;" data-delete-key="${deleteKey}" onclick="updateTaskStatus(this.getAttribute('data-delete-key'))">
+                                    <div class="shift-item task-bar" style="border-left:3px solid ${color}; background:#FFEBEE; color:#D84315; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size:0.75rem; cursor: pointer; font-weight:bold;" data-delete-key="${deleteKey}" onclick="openEditModal(this.getAttribute('data-delete-key'))">
                                         <span class="shift-name">${s.content}</span>
                                     </div>
                                 `;
@@ -2226,9 +2233,24 @@
             const d = String(parts[2]).padStart(2, '0');
             document.getElementById('edit-date').value = `${y}-${m}-${d}`;
             document.getElementById('edit-member').value = shift.member;
-            document.getElementById('edit-content').value = shift.content;
+
+            // Handle task specific logic
+            const isTask = shift.type.startsWith('task');
+            document.getElementById('edit-task-status-group').style.display = isTask ? 'flex' : 'none';
+            document.getElementById('edit-task-done').checked = shift.type === 'task-done';
+
+            // Remove ✔️ prefix when editing if it exists
+            let contentVal = shift.content;
+            if (isTask) contentVal = contentVal.replace(/^✔️\s*/, '');
+            document.getElementById('edit-content').value = contentVal;
 
             document.getElementById('edit-modal-overlay').classList.add('active');
+
+            // Dynamic UI change based on member selection
+            document.getElementById('edit-member').addEventListener('change', function (e) {
+                const showCheck = e.target.value === '全員/〆';
+                document.getElementById('edit-task-status-group').style.display = showCheck ? 'flex' : 'none';
+            });
         }
 
         function closeEditModal(e) {
@@ -2277,18 +2299,28 @@
             else if (newMember === '全員/〆') color = '#FF7043';
             else if (newMember === '自分たち') color = '#f5f5f5';
 
-            // Determine type
+            // Determine type and content adjustments
             let newType = oldShift.type;
-            if (newMember === '全員/〆' && !newType.startsWith('task')) newType = 'task';
-            if (newMember === '自分たち') newType = 'team_offline';
-            if (newMember !== '全員/〆' && newMember !== '自分たち' && newType.startsWith('task')) newType = 'shift';
+            let finalContent = newContent;
+
+            if (newMember === '全員/〆') {
+                const isDone = document.getElementById('edit-task-done').checked;
+                newType = isDone ? 'task-done' : 'task';
+                if (isDone && !finalContent.startsWith('✔️')) {
+                    finalContent = '✔️ ' + finalContent; // Add checkmark prefix for backward compatibility logic
+                }
+            } else if (newMember === '自分たち') {
+                newType = 'team_offline';
+            } else {
+                newType = 'shift';
+            }
 
             const newShift = {
                 id: Date.now() + Math.random(),
                 date: `${m}/${d}`,
                 dateKey: newDateKey,
                 member: newMember,
-                content: newContent,
+                content: finalContent,
                 type: newType,
                 memberColor: color,
                 timestamp: pd.getTime()
