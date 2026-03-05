@@ -605,6 +605,94 @@
             background: var(--color-accent);
             color: white;
         }
+
+        /* Edit Modal */
+        .edit-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 950;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .edit-modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .edit-modal {
+            background: var(--color-white);
+            border-radius: var(--radius-main);
+            padding: 24px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            transform: translateY(20px) scale(0.95);
+            transition: transform 0.3s;
+        }
+
+        .edit-modal-overlay.active .edit-modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .edit-modal h3 {
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .edit-modal .form-group {
+            margin-bottom: 14px;
+        }
+
+        .edit-modal .form-group label {
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        .edit-modal select {
+            width: 100%;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--color-border);
+            background-color: var(--color-bg);
+            font-family: inherit;
+            font-size: 1rem;
+            color: var(--color-text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .edit-modal select:focus {
+            border-color: var(--color-accent);
+        }
+
+        .edit-modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .edit-modal-actions .btn {
+            flex: 1;
+        }
+
+        .btn-danger {
+            background-color: #d32f2f;
+            color: white;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background-color: #b71c1c;
+        }
     </style>
 </head>
 
@@ -809,6 +897,38 @@
                 <button class="btn btn-secondary" onclick="finishBotInteraction(false)">休業日なしで完了</button>
                 <button class="btn" onclick="finishBotInteraction(true)"
                     style="background:var(--col-kombu); color:var(--color-text);">決定して完了</button>
+            </div>
+        </div>
+
+        <!-- Edit Modal -->
+        <div id="edit-modal-overlay" class="edit-modal-overlay" onclick="closeEditModal(event)">
+            <div class="edit-modal" onclick="event.stopPropagation()">
+                <h3>✏️ 予定を編集</h3>
+                <div class="form-group">
+                    <label>📅 日付</label>
+                    <input type="date" id="edit-date">
+                </div>
+                <div class="form-group">
+                    <label>👤 メンバー</label>
+                    <select id="edit-member">
+                        <option value="ササミ">ササミ</option>
+                        <option value="ツナ">ツナ</option>
+                        <option value="コンブ">コンブ</option>
+                        <option value="全員/〆">全員/〆</option>
+                        <option value="自分たち">自分たち（休業日）</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>📝 内容</label>
+                    <input type="text" id="edit-content" placeholder="例: 10-18, 休み, 展示14時～...">
+                </div>
+                <div class="edit-modal-actions">
+                    <button class="btn btn-danger btn-sm" onclick="deleteFromEditModal()" style="flex:0.6;">🗑
+                        削除</button>
+                    <button class="btn btn-secondary btn-sm" onclick="closeEditModal()">キャンセル</button>
+                    <button class="btn btn-sm" onclick="saveEditModal()"
+                        style="background:var(--col-kombu); color:var(--color-text);">💾 保存</button>
+                </div>
             </div>
         </div>
 
@@ -1932,7 +2052,7 @@
 
                             if (isOff) {
                                 filteredBars += `
-                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
+                                    <div class="shift-item" style="background-color: #f8f9fa; color: #aaa; border-left: 3px solid #ccc; padding: 2px 4px; margin-top: 2px; border-radius: 2px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;" data-delete-key="${deleteKey}" onclick="openEditModal(this.getAttribute('data-delete-key'))">
                                         <span class="shift-name">${s.member}</span>
                                         <span class="shift-time" style="text-decoration: line-through;">休み</span>
                                     </div>
@@ -1945,7 +2065,7 @@
                                 const barE = e ? '#fff' : color;
 
                                 filteredBars += `
-                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" data-delete-key="${deleteKey}" onclick="confirmDeleteShift(this.getAttribute('data-delete-key'))">
+                                    <div class="shift-item" style="background-color: ${color}20; color: #333; padding: 2px 4px; margin-top: 3px; border-radius: 3px; font-size: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" data-delete-key="${deleteKey}" onclick="openEditModal(this.getAttribute('data-delete-key'))">
                                         <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                             <span class="shift-name" style="font-weight:bold;">${s.member}</span>
                                             <span style="font-size: 0.7rem; color: #666; background: #fff; padding: 0 3px; border-radius: 2px;">${content}</span>
@@ -2083,6 +2203,137 @@
                     <div class="calendar-day-content">${filteredBars}</div>
                 `;
                 elCalendarContainer.appendChild(cell);
+            }
+        }
+        // --- Edit Modal Logic ---
+        let editingDeleteKey = null;
+
+        function openEditModal(deleteKey) {
+            editingDeleteKey = deleteKey;
+            const shift = appData.shifts.find(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                return key === deleteKey;
+            });
+            if (!shift) {
+                alert('該当する予定が見つかりません。');
+                return;
+            }
+
+            // Populate form
+            const parts = shift.dateKey.split('/');
+            const y = parts[0];
+            const m = String(parts[1]).padStart(2, '0');
+            const d = String(parts[2]).padStart(2, '0');
+            document.getElementById('edit-date').value = `${y}-${m}-${d}`;
+            document.getElementById('edit-member').value = shift.member;
+            document.getElementById('edit-content').value = shift.content;
+
+            document.getElementById('edit-modal-overlay').classList.add('active');
+        }
+
+        function closeEditModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('edit-modal-overlay').classList.remove('active');
+            editingDeleteKey = null;
+        }
+
+        function deleteFromEditModal() {
+            if (!editingDeleteKey) return;
+            closeEditModal();
+            confirmDeleteShift(editingDeleteKey);
+        }
+
+        async function saveEditModal() {
+            if (!editingDeleteKey) return;
+
+            const oldShift = appData.shifts.find(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                return key === editingDeleteKey;
+            });
+            if (!oldShift) {
+                alert('保存元の予定が見つかりません。');
+                return;
+            }
+
+            const newDateStr = document.getElementById('edit-date').value;
+            const newMember = document.getElementById('edit-member').value;
+            const newContent = document.getElementById('edit-content').value.trim();
+
+            if (!newDateStr || !newContent) {
+                alert('日付と内容を入力してください。');
+                return;
+            }
+
+            const pd = new Date(newDateStr);
+            const y = pd.getFullYear();
+            const m = pd.getMonth() + 1;
+            const d = pd.getDate();
+            const newDateKey = `${y}/${m}/${d}`;
+
+            // Determine color
+            let color = oldShift.memberColor || '#eee';
+            const mConf = memberConfig.find(mc => mc.name === newMember);
+            if (mConf) color = mConf.color;
+            else if (newMember === '全員/〆') color = '#FF7043';
+            else if (newMember === '自分たち') color = '#f5f5f5';
+
+            // Determine type
+            let newType = oldShift.type;
+            if (newMember === '全員/〆' && !newType.startsWith('task')) newType = 'task';
+            if (newMember === '自分たち') newType = 'team_offline';
+            if (newMember !== '全員/〆' && newMember !== '自分たち' && newType.startsWith('task')) newType = 'shift';
+
+            const newShift = {
+                id: Date.now() + Math.random(),
+                date: `${m}/${d}`,
+                dateKey: newDateKey,
+                member: newMember,
+                content: newContent,
+                type: newType,
+                memberColor: color,
+                timestamp: pd.getTime()
+            };
+
+            // Check if nothing changed
+            const oldKey = editingDeleteKey;
+            const newKey = `${newShift.dateKey}-${newShift.member}-${newShift.content}-${newShift.type}`.replace(/\s+/g, '');
+            if (oldKey === newKey) {
+                closeEditModal();
+                return;
+            }
+
+            // Update local data
+            appData.shifts = appData.shifts.filter(s => {
+                const key = `${s.dateKey}-${s.member}-${s.content}-${s.type}`.replace(/\s+/g, '');
+                return key !== oldKey;
+            });
+            appData.shifts.push(newShift);
+            appData.shifts.sort((a, b) => a.timestamp - b.timestamp);
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(appData));
+            renderCalendar();
+            closeEditModal();
+
+            // Sync to cloud
+            try {
+                elLoading.classList.remove('hidden');
+                elLoadingText.innerText = '予定を更新中...';
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'update', oldDeleteKey: oldKey, newData: newShift }),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                const resJson = await response.json();
+                if (!resJson.success) {
+                    console.error('Update failed on server', resJson);
+                    alert('サーバー上での更新に失敗しました。');
+                    await loadData();
+                    renderCalendar();
+                }
+            } catch (e) {
+                console.error('Update request error', e);
+                alert('更新リクエストに失敗しました: ' + e.message);
+            } finally {
+                elLoading.classList.add('hidden');
             }
         }
     </script>

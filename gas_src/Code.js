@@ -123,6 +123,64 @@ function doPost(e) {
     }
     // ----------------------------
 
+    // --- 更新アクションの処理 ---
+    if (!Array.isArray(postData) && postData.action === 'update') {
+      const oldKey = postData.oldDeleteKey;
+      const newData = postData.newData;
+      if (!oldKey || !newData) throw new Error("更新用の oldDeleteKey / newData が指定されていません");
+
+      console.log("Update Request Received. OldKey:", oldKey);
+
+      // 1. 旧エントリの削除
+      const data = sheet.getDataRange().getValues();
+      if (data.length > 1) {
+        const headers = data[0];
+        const dkIdx = headers.indexOf('dateKey');
+        const mbIdx = headers.indexOf('member');
+        const ctIdx = headers.indexOf('content');
+        const tpIdx = headers.indexOf('type');
+
+        for (let i = data.length - 1; i > 0; i--) {
+          let rawDk = data[i][dkIdx];
+          let dk = "";
+          if (rawDk instanceof Date) {
+            dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
+          } else if (rawDk) {
+            dk = rawDk.toString().replace(/\s+/g, '');
+            const parts = dk.split('/');
+            if (parts.length === 3) {
+              const m = parseInt(parts[1], 10);
+              const d = parseInt(parts[2], 10);
+              dk = `${parts[0]}/${m}/${d}`;
+            }
+          }
+          const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
+          if (rowKey === oldKey) {
+            console.log(`Update: Deleting old row ${i + 1}`);
+            sheet.deleteRow(i + 1);
+            break;
+          }
+        }
+      }
+
+      // 2. 新エントリの追加
+      const newRow = [
+        newData.id || Date.now() + Math.random(),
+        newData.date || "",
+        newData.dateKey || "",
+        newData.member || "",
+        newData.content || "",
+        newData.type || "shift",
+        newData.memberColor || "#eee",
+        newData.timestamp || Date.now()
+      ];
+      sheet.appendRow(newRow);
+
+      return ContentService.createTextOutput(JSON.stringify({ success: true, updated: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    // ----------------------------
+
     const shifts = Array.isArray(postData) ? postData : [postData];
 
 
