@@ -2261,8 +2261,9 @@
 
         function deleteFromEditModal() {
             if (!editingDeleteKey) return;
+            const keyToDelete = editingDeleteKey;
             closeEditModal();
-            confirmDeleteShift(editingDeleteKey);
+            confirmDeleteShift(keyToDelete);
         }
 
         async function saveEditModal() {
