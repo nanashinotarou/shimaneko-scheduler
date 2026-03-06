@@ -64,47 +64,48 @@ function doPost(e) {
 
     // --- 削除アクションの処理 ---
     if (!Array.isArray(postData) && postData.action === 'delete') {
+      const targetData = postData.targetData;
       const targetKey = postData.deleteKey;
-      if (!targetKey) throw new Error("削除用の deleteKey が指定されていません");
-
-      console.log("Delete Request Received. TargetKey:", targetKey);
+      if (!targetData && !targetKey) throw new Error("削除用の対象データが指定されていません");
 
       const data = sheet.getDataRange().getValues();
       if (data.length > 1) {
         const headers = data[0];
+        const idIdx = headers.indexOf('id');
         const dkIdx = headers.indexOf('dateKey');
         const mbIdx = headers.indexOf('member');
         const ctIdx = headers.indexOf('content');
         const tpIdx = headers.indexOf('type');
+        const tsIdx = headers.indexOf('timestamp');
 
         let foundMatch = false;
 
-        // シートの下から上へ検索し、該当する行を削除 (行インデックスは1始まり)
         for (let i = data.length - 1; i > 0; i--) {
-          let rawDk = data[i][dkIdx];
-          let dk = "";
-
-          if (rawDk instanceof Date) {
-            dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
-          } else if (rawDk) {
-            dk = rawDk.toString().replace(/\s+/g, '');
-            // YYYY/0M/0D -> YYYY/M/D にゼロ埋めを削除して統一
-            const parts = dk.split('/');
-            if (parts.length === 3) {
-              const m = parseInt(parts[1], 10);
-              const d = parseInt(parts[2], 10);
-              dk = `${parts[0]}/${m}/${d}`;
+          let match = false;
+          if (targetData) {
+            if (targetData.id && data[i][idIdx] && String(data[i][idIdx]) === String(targetData.id)) {
+              match = true;
+            } else if (data[i][mbIdx] === targetData.member && data[i][ctIdx] === targetData.content && String(data[i][tsIdx]) === String(targetData.timestamp)) {
+              match = true;
             }
+          } else if (targetKey) {
+            // Fallback for old clients
+            let rawDk = data[i][dkIdx];
+            let dk = "";
+            if (rawDk instanceof Date) {
+              dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
+            } else if (rawDk) {
+              dk = rawDk.toString().replace(/\s+/g, '');
+              const parts = dk.split('/');
+              if (parts.length === 3) {
+                dk = `${parts[0]}/${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}`;
+              }
+            }
+            const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
+            if (rowKey === targetKey) match = true;
           }
-          const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
 
-          // Detailed logging for the last 5 rows to see what's happening
-          if (i > data.length - 6) {
-            console.log(`Checking row ${i + 1}. DK: [${dk}], RowKey: [${rowKey}]`);
-          }
-
-          if (rowKey === targetKey) {
-            console.log(`Match found at row ${i + 1}. Deleting.`);
+          if (match) {
             sheet.deleteRow(i + 1);
             foundMatch = true;
             return ContentService.createTextOutput(JSON.stringify({ success: true, deleted: 1 }))
@@ -113,8 +114,7 @@ function doPost(e) {
         }
 
         if (!foundMatch) {
-          console.log("No match found for targetKey:", targetKey);
-          return ContentService.createTextOutput(JSON.stringify({ success: false, deleted: 0, message: "対象データが見つかりません。探したKey: " + targetKey }))
+          return ContentService.createTextOutput(JSON.stringify({ success: false, deleted: 0, message: "対象データが見つかりません" }))
             .setMimeType(ContentService.MimeType.JSON);
         }
       }
@@ -125,45 +125,55 @@ function doPost(e) {
 
     // --- 更新アクションの処理 ---
     if (!Array.isArray(postData) && postData.action === 'update') {
+      const oldTargetData = postData.oldTargetData;
       const oldKey = postData.oldDeleteKey;
       const newData = postData.newData;
-      if (!oldKey || !newData) throw new Error("更新用の oldDeleteKey / newData が指定されていません");
+      if ((!oldTargetData && !oldKey) || !newData) throw new Error("更新用のデータが指定されていません");
 
-      console.log("Update Request Received. OldKey:", oldKey);
-
-      // 1. 旧エントリの削除
       const data = sheet.getDataRange().getValues();
+      let foundMatch = false;
       if (data.length > 1) {
         const headers = data[0];
+        const idIdx = headers.indexOf('id');
         const dkIdx = headers.indexOf('dateKey');
         const mbIdx = headers.indexOf('member');
         const ctIdx = headers.indexOf('content');
         const tpIdx = headers.indexOf('type');
+        const tsIdx = headers.indexOf('timestamp');
 
         for (let i = data.length - 1; i > 0; i--) {
-          let rawDk = data[i][dkIdx];
-          let dk = "";
-          if (rawDk instanceof Date) {
-            dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
-          } else if (rawDk) {
-            dk = rawDk.toString().replace(/\s+/g, '');
-            const parts = dk.split('/');
-            if (parts.length === 3) {
-              const m = parseInt(parts[1], 10);
-              const d = parseInt(parts[2], 10);
-              dk = `${parts[0]}/${m}/${d}`;
+          let match = false;
+          if (oldTargetData) {
+            if (oldTargetData.id && data[i][idIdx] && String(data[i][idIdx]) === String(oldTargetData.id)) {
+              match = true;
+            } else if (data[i][mbIdx] === oldTargetData.member && data[i][ctIdx] === oldTargetData.content && String(data[i][tsIdx]) === String(oldTargetData.timestamp)) {
+              match = true;
             }
+          } else if (oldKey) {
+            let rawDk = data[i][dkIdx];
+            let dk = "";
+            if (rawDk instanceof Date) {
+              dk = `${rawDk.getFullYear()}/${rawDk.getMonth() + 1}/${rawDk.getDate()}`;
+            } else if (rawDk) {
+              dk = rawDk.toString().replace(/\s+/g, '');
+              const parts = dk.split('/');
+              if (parts.length === 3) {
+                dk = `${parts[0]}/${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}`;
+              }
+            }
+            const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
+            if (rowKey === oldKey) match = true;
           }
-          const rowKey = `${dk}-${data[i][mbIdx]}-${data[i][ctIdx]}-${data[i][tpIdx]}`.replace(/\s+/g, '');
-          if (rowKey === oldKey) {
-            console.log(`Update: Deleting old row ${i + 1}`);
+
+          if (match) {
             sheet.deleteRow(i + 1);
+            foundMatch = true;
             break;
           }
         }
       }
 
-      // 2. 新エントリの追加
+      // 新エントリの追加
       const newRow = [
         newData.id || Date.now() + Math.random(),
         newData.date || "",
@@ -176,7 +186,7 @@ function doPost(e) {
       ];
       sheet.appendRow(newRow);
 
-      return ContentService.createTextOutput(JSON.stringify({ success: true, updated: true }))
+      return ContentService.createTextOutput(JSON.stringify({ success: true, updated: true, foundOld: foundMatch }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     // ----------------------------

@@ -1832,7 +1832,7 @@
                     elLoadingText.innerText = "予定をクラウドから削除中...";
                     const response = await fetch(GAS_WEB_APP_URL, {
                         method: 'POST',
-                        body: JSON.stringify({ action: 'delete', deleteKey: deleteKey }),
+                        body: JSON.stringify({ action: 'delete', targetData: shiftToDelete }),
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                     });
                     const resJson = await response.json();
@@ -1887,7 +1887,7 @@
                     // 1. Delete old
                     await fetch(GAS_WEB_APP_URL, {
                         method: 'POST',
-                        body: JSON.stringify({ action: 'delete', deleteKey: oldKey }),
+                        body: JSON.stringify({ action: 'delete', targetData: shift }),
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                     });
                     // 2. Add new
@@ -2351,7 +2351,7 @@
                 elLoadingText.innerText = '予定を更新中...';
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ action: 'update', oldDeleteKey: oldKey, newData: newShift }),
+                    body: JSON.stringify({ action: 'update', oldTargetData: oldShift, newData: newShift }),
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                 });
                 const resJson = await response.json();
