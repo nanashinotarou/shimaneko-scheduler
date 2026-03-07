@@ -16,6 +16,11 @@ function getSheet() {
 
 function doGet(e) {
   try {
+    // SNSデータの取得リクエスト
+    if (e && e.parameter && e.parameter.type === 'sns') {
+      return fetchNotionSNS();
+    }
+
     const sheet = getSheet();
     const data = sheet.getDataRange().getValues();
 
@@ -47,6 +52,60 @@ function doGet(e) {
     });
 
     return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ===== Notion API Proxy for SNS Schedule =====
+function getNotionKey() {
+  const key = PropertiesService.getScriptProperties().getProperty('NOTION_KEY');
+  return key || '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';
+}
+const SNS_DB_ID = '31ca4923-ceb5-8101-921e-f837ceb2bbb9';
+
+function fetchNotionSNS() {
+  try {
+    const url = 'https://api.notion.com/v1/databases/' + SNS_DB_ID + '/query';
+    const options = {
+      method: 'post',
+      headers: {
+        'Authorization': 'Bearer ' + getNotionKey(),
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify({
+        sorts: [{ property: '投稿日', direction: 'ascending' }],
+        page_size: 100
+      }),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(url, options);
+    const data = JSON.parse(response.getContentText());
+
+    if (!data.results) {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'Notion API error', details: data }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Notion結果をフラットなJSONに変換
+    const entries = data.results.map(page => {
+      const props = page.properties;
+      return {
+        id: page.id,
+        content: props['投稿内容']?.title?.[0]?.plain_text || '',
+        date: props['投稿日']?.date?.start || '',
+        platform: props['プラットフォーム']?.select?.name || '',
+        status: props['ステータス']?.select?.name || '',
+        format: props['投稿形式']?.select?.name || '',
+        assignee: props['担当']?.select?.name || ''
+      };
+    });
+
+    return ContentService.createTextOutput(JSON.stringify(entries))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ error: err.message }))

@@ -693,6 +693,102 @@
         .btn-danger:hover {
             background-color: #b71c1c;
         }
+
+        /* ===== SNS Mode Styles ===== */
+        .mode-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid var(--color-text);
+            max-width: 360px;
+        }
+
+        .mode-tab {
+            flex: 1;
+            padding: 10px 20px;
+            text-align: center;
+            font-weight: 700;
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            background: var(--color-white);
+            color: var(--color-text);
+            transition: all 0.2s;
+        }
+
+        .mode-tab.active {
+            background: var(--color-text);
+            color: white;
+        }
+
+        .mode-tab:hover:not(.active) {
+            background: var(--color-bg);
+        }
+
+        .sns-bar {
+            padding: 4px 6px;
+            margin-top: 3px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: default;
+            line-height: 1.3;
+        }
+
+        .sns-bar .sns-icon {
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .sns-bar .sns-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sns-bar.ig {
+            background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 100%);
+            border-left: 3px solid #E1306C;
+            color: #880E4F;
+        }
+
+        .sns-bar.yt {
+            background: #FFEBEE;
+            border-left: 3px solid #FF0000;
+            color: #B71C1C;
+        }
+
+        .sns-bar.done {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        .sns-legend {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+            font-size: 0.8rem;
+        }
+
+        .sns-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sns-filter-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 
@@ -705,7 +801,15 @@
 
         <section id="home-section">
             <div class="card settings-container" style="padding: 16px; max-width: 1400px; margin-bottom: 16px;">
-                <div class="calendar-header-actions" style="flex-direction: column; align-items: flex-start;">
+                <!-- Mode Tabs -->
+                <div class="mode-tabs">
+                    <button class="mode-tab active" id="mode-shift" onclick="switchMode('shift')">📅 シフト</button>
+                    <button class="mode-tab" id="mode-sns" onclick="switchMode('sns')">📱 SNS更新</button>
+                </div>
+
+                <!-- Shift mode filters -->
+                <div id="shift-filters" class="calendar-header-actions"
+                    style="flex-direction: column; align-items: flex-start;">
                     <div class="filter-group">
                         <button class="filter-btn active" onclick="toggleFilter('all')" id="filter-all">全て表示</button>
                         <button class="filter-btn" onclick="toggleFilter('sasami')" id="filter-sasami">ササミ</button>
@@ -724,6 +828,28 @@
                             id="filter-avail-evening">夕方(16~) 3人OK</button>
                         <button class="filter-btn" onclick="toggleAvailFilter('avail-fullday')"
                             id="filter-avail-fullday">終日 3人OK</button>
+                    </div>
+                </div>
+
+                <!-- SNS mode filters -->
+                <div id="sns-filters" style="display: none;">
+                    <div class="sns-filter-group">
+                        <button class="filter-btn active" onclick="toggleSnsFilter('all')"
+                            id="sns-filter-all">すべて</button>
+                        <button class="filter-btn" onclick="toggleSnsFilter('instagram')" id="sns-filter-instagram">📸
+                            Instagram</button>
+                        <button class="filter-btn" onclick="toggleSnsFilter('youtube')" id="sns-filter-youtube">🎬
+                            YouTube</button>
+                    </div>
+                    <div class="sns-filter-group">
+                        <button class="filter-btn active" onclick="toggleSnsStatusFilter('all')"
+                            id="sns-status-all">全ステータス</button>
+                        <button class="filter-btn" onclick="toggleSnsStatusFilter('予定')" id="sns-status-予定">📝
+                            予定</button>
+                        <button class="filter-btn" onclick="toggleSnsStatusFilter('制作中')" id="sns-status-制作中">🔨
+                            制作中</button>
+                        <button class="filter-btn" onclick="toggleSnsStatusFilter('投稿済み')" id="sns-status-投稿済み">✅
+                            投稿済み</button>
                     </div>
                 </div>
 
@@ -752,7 +878,8 @@
                 <div id="calendar-container" class="calendar-grid"></div>
             </div>
 
-            <div id="calendar-legend"
+            <!-- Shift Legend -->
+            <div id="shift-legend"
                 style="margin-top: 16px; font-size: 0.8rem; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
                 <div><span
                         style="display:inline-block; width:12px; height:12px; background:#FFFDE7; border: 2px solid #FFD54F;"></span>
@@ -762,6 +889,19 @@
                     3人共通予定あり</div>
                 <div><span style="display:inline-block; width:12px; height:12px; background:#f5f5f5;"></span> しまねこ休業日
                 </div>
+            </div>
+
+            <!-- SNS Legend -->
+            <div id="sns-legend" class="sns-legend" style="display: none;">
+                <div class="sns-legend-item"><span
+                        style="display:inline-block; width:12px; height:12px; background:linear-gradient(135deg, #fce4ec, #f3e5f5); border-left: 3px solid #E1306C;"></span>
+                    Instagram</div>
+                <div class="sns-legend-item"><span
+                        style="display:inline-block; width:12px; height:12px; background:#FFEBEE; border-left: 3px solid #FF0000;"></span>
+                    YouTube</div>
+                <div class="sns-legend-item">📝 予定</div>
+                <div class="sns-legend-item">✅ 投稿済み</div>
+                <div class="sns-legend-item" style="color:#888;">🔴ササミ 🔵ツナ 🟡コンブ 🟢全体</div>
             </div>
         </section>
 
@@ -1941,7 +2081,11 @@
         // --- New Full Grid Calendar Rendering ---
         function changeMonth(offset) {
             currentCalendarMonth = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth() + offset, 1);
-            renderCalendar();
+            if (currentMode === 'sns') {
+                renderSnsCalendar();
+            } else {
+                renderCalendar();
+            }
         }
 
         function renderCalendar() {
@@ -2369,7 +2513,202 @@
                 elLoading.classList.add('hidden');
             }
         }
+        // ===== SNS Mode Logic =====
+        let currentMode = 'shift'; // 'shift' or 'sns'
+        let snsData = [];
+        let snsDataLoaded = false;
+        let snsPlatformFilter = 'all'; // 'all', 'instagram', 'youtube'
+        let snsStatusFilter = 'all'; // 'all', '予定', '制作中', '投稿済み'
+
+        const assigneeEmoji = {
+            'ササミ': '🔴',
+            'ツナ': '🔵',
+            'コンブ': '🟡',
+            '全体': '🟢'
+        };
+
+        function switchMode(mode) {
+            currentMode = mode;
+
+            // Update tab active states
+            document.getElementById('mode-shift').classList.toggle('active', mode === 'shift');
+            document.getElementById('mode-sns').classList.toggle('active', mode === 'sns');
+
+            // Toggle filter visibility
+            document.getElementById('shift-filters').style.display = mode === 'shift' ? '' : 'none';
+            document.getElementById('sns-filters').style.display = mode === 'sns' ? '' : 'none';
+
+            // Toggle legend visibility
+            document.getElementById('shift-legend').style.display = mode === 'shift' ? '' : 'none';
+            document.getElementById('sns-legend').style.display = mode === 'sns' ? '' : 'none';
+
+            if (mode === 'sns') {
+                if (!snsDataLoaded) {
+                    loadSnsData();
+                } else {
+                    renderSnsCalendar();
+                }
+            } else {
+                renderCalendar();
+            }
+        }
+
+        async function loadSnsData() {
+            try {
+                elLoading.classList.remove('hidden');
+                elLoadingText.innerText = 'SNSスケジュールをNotionから読み込み中...';
+
+                const response = await fetch('/api/sns');
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('SNSデータの取得に失敗しました: ' + data.error);
+                    return;
+                }
+
+                snsData = data;
+                snsDataLoaded = true;
+                renderSnsCalendar();
+            } catch (e) {
+                console.error('SNS load error', e);
+                alert('SNSデータの読み込みに失敗しました: ' + e.message);
+            } finally {
+                elLoading.classList.add('hidden');
+            }
+        }
+
+        function toggleSnsFilter(platform) {
+            snsPlatformFilter = platform;
+            ['all', 'instagram', 'youtube'].forEach(f => {
+                const el = document.getElementById('sns-filter-' + f);
+                if (el) el.classList.toggle('active', f === platform);
+            });
+            renderSnsCalendar();
+        }
+
+        function toggleSnsStatusFilter(status) {
+            snsStatusFilter = status;
+            document.querySelectorAll('[id^="sns-status-"]').forEach(el => {
+                el.classList.remove('active');
+            });
+            const targetId = status === 'all' ? 'sns-status-all' : 'sns-status-' + status;
+            const el = document.getElementById(targetId);
+            if (el) el.classList.add('active');
+            renderSnsCalendar();
+        }
+
+        function renderSnsCalendar() {
+            elCalendarContainer.innerHTML = '';
+
+            const year = currentCalendarMonth.getFullYear();
+            const month = currentCalendarMonth.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Update month header
+            const monthHeader = document.getElementById('calendar-month-title');
+            if (monthHeader) {
+                monthHeader.innerText = `${year}年 ${month + 1} 月`;
+            }
+
+            // Filter SNS data
+            const filtered = snsData.filter(entry => {
+                if (snsPlatformFilter !== 'all' && entry.platform.toLowerCase() !== snsPlatformFilter) return false;
+                if (snsStatusFilter !== 'all' && entry.status !== snsStatusFilter) return false;
+                return true;
+            });
+
+            // Group by date
+            const grouped = {};
+            filtered.forEach(entry => {
+                if (!entry.date) return;
+                const d = new Date(entry.date);
+                const key = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(entry);
+            });
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-day empty-mobile';
+                emptyCell.style.opacity = '0.3';
+                elCalendarContainer.appendChild(emptyCell);
+            }
+
+            const today = new Date();
+            const isCurrentMonth = (year === today.getFullYear() && month === today.getMonth());
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${year}/${month + 1}/${d}`;
+                const apiDateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dailyEntries = grouped[dateKey] || [];
+                const holidayName = holidaysData[apiDateKey];
+
+                const cell = document.createElement('div');
+                cell.className = 'calendar-day';
+
+                let dayOfWeek = new Date(year, month, d).getDay();
+                let dateColorStr = '';
+                let holidayHtml = '';
+
+                if (dayOfWeek === 0 || !!holidayName) {
+                    dateColorStr = 'color: #d32f2f;';
+                } else if (dayOfWeek === 6) {
+                    dateColorStr = 'color: #1976d2;';
+                }
+
+                if (holidayName) {
+                    holidayHtml = `<div style="font-size:0.65rem; color:#d32f2f; font-weight:bold; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;" title="${holidayName}">🎌 ${holidayName}</div>`;
+                    cell.style.cssText += 'background-color: #FFF0F2; border: 2px solid #FFCDD2;';
+                }
+
+                const isToday = (isCurrentMonth && d === today.getDate());
+                if (isToday) {
+                    cell.style.border = '2px solid #4CAF50';
+                    cell.style.boxShadow = '0 0 8px rgba(76, 175, 80, 0.4)';
+                    if (!holidayName) cell.style.backgroundColor = '#F1F8E9';
+                }
+
+                // Build SNS bars
+                let barsHtml = '';
+                dailyEntries.forEach(entry => {
+                    const isIG = entry.platform === 'Instagram';
+                    const platformClass = isIG ? 'ig' : 'yt';
+                    const doneClass = entry.status === '投稿済み' ? ' done' : '';
+                    const icon = isIG ? '📸' : '🎬';
+                    const emoji = assigneeEmoji[entry.assignee] || '';
+                    const statusIcon = entry.status === '投稿済み' ? '✅' : entry.status === '制作中' ? '🔨' : '';
+                    const formatTag = entry.format ? `<span style="font-size:0.6rem; background:rgba(0,0,0,0.06); padding:1px 3px; border-radius:2px;">${entry.format}</span>` : '';
+
+                    barsHtml += `
+                        <div class="sns-bar ${platformClass}${doneClass}" title="${entry.platform} | ${entry.content} | ${entry.assignee} | ${entry.status}">
+                            <span class="sns-icon">${icon}</span>
+                            <span class="sns-text">${emoji} ${statusIcon} ${entry.content}</span>
+                            ${formatTag}
+                        </div>
+                    `;
+                });
+
+                // Count badge
+                let countBadge = '';
+                if (dailyEntries.length > 0) {
+                    countBadge = `<span style="font-size:0.65rem; background:#FF9800; color:white; padding:1px 5px; border-radius:10px; margin-left:4px;">${dailyEntries.length}</span>`;
+                }
+
+                cell.innerHTML = `
+                    <div class="date-header" style="justify-content: flex-start; gap: 4px; ${dateColorStr}">
+                        <div style="${dateColorStr}">${d}</div>
+                        ${countBadge}
+                    </div>
+                    ${holidayHtml}
+                    <div class="calendar-day-content">${barsHtml}</div>
+                `;
+                elCalendarContainer.appendChild(cell);
+            }
+        }
     </script>
+
 
 </body>
 
