@@ -62,7 +62,7 @@ function doGet(e) {
 // ===== Notion API Proxy for SNS Schedule =====
 function getNotionKey() {
   const key = PropertiesService.getScriptProperties().getProperty('NOTION_KEY');
-  return key || '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';
+  return key;
 }
 const SNS_DB_ID = '31ca4923-ceb5-8101-921e-f837ceb2bbb9';
 
