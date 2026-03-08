@@ -44,53 +44,60 @@ export async function onRequest(context) {
     };
 
     try {
-        // 1. Fetch current items to delete
-        const queryRes = await fetch('https://api.notion.com/v1/databases/' + SNS_DB_ID + '/query', {
-            method: 'POST',
-            headers
-        });
-        const queryData = await queryRes.json();
+        const url = new URL(context.request.url);
+        const action = url.searchParams.get('action');
 
-        // Delete all
-        const deletePromises = (queryData.results || []).map(page =>
-            fetch('https://api.notion.com/v1/pages/' + page.id, {
-                method: 'PATCH',
-                headers,
-                body: JSON.stringify({ archived: true })
-            })
-        );
-        await Promise.all(deletePromises);
-
-        // 2. Insert new exact checklist items
-        let results = [];
-        for (const item of CHECKLIST) {
-            const props = {
-                "投稿内容": { "title": [{ "text": { "content": item.title } }] },
-                "ステータス": { "select": { "name": item.status } },
-                "プラットフォーム": { "select": { "name": item.platform } },
-                "投稿形式": { "select": { "name": item.format } },
-                "担当": { "select": { "name": item.assignee } }
-            };
-
-            if (item.date) {
-                props["投稿日"] = { "date": { "start": item.date } };
-            }
-
-            const res = await fetch('https://api.notion.com/v1/pages', {
+        if (action === 'delete') {
+            const queryRes = await fetch('https://api.notion.com/v1/databases/' + SNS_DB_ID + '/query', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({
-                    parent: { database_id: SNS_DB_ID },
-                    properties: props
-                })
+                headers
             });
-            results.push(await res.json());
+            const queryData = await queryRes.json();
+
+            const deletePromises = (queryData.results || []).map(page =>
+                fetch('https://api.notion.com/v1/pages/' + page.id, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({ archived: true })
+                })
+            );
+            await Promise.all(deletePromises);
+            return new Response(JSON.stringify({ success: true, message: 'deleted ' + queryData.results.length }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        return new Response(JSON.stringify({ success: true, count: CHECKLIST.length, details: results }), {
-            headers: { 'Content-Type': 'application/json' }
-        });
+        if (action === 'insert1' || action === 'insert2') {
+            const sliceStart = action === 'insert1' ? 0 : 16;
+            const sliceEnd = action === 'insert1' ? 16 : CHECKLIST.length;
+            const chunk = CHECKLIST.slice(sliceStart, sliceEnd);
 
+            let results = [];
+            for (const item of chunk) {
+                const props = {
+                    "投稿内容": { "title": [{ "text": { "content": item.title } }] },
+                    "ステータス": { "select": { "name": item.status } },
+                    "プラットフォーム": { "select": { "name": item.platform } },
+                    "投稿形式": { "select": { "name": item.format } },
+                    "担当": { "select": { "name": item.assignee } }
+                };
+
+                if (item.date) {
+                    props["投稿日"] = { "date": { "start": item.date } };
+                }
+
+                const res = await fetch('https://api.notion.com/v1/pages', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        parent: { database_id: SNS_DB_ID },
+                        properties: props
+                    })
+                });
+                results.push(await res.json());
+            }
+            return new Response(JSON.stringify({ success: true, message: 'inserted ' + chunk.length }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        return new Response(JSON.stringify({ success: false, message: 'specify ?action=delete|insert1|insert2' }));
     } catch (e) {
         return new Response(JSON.stringify({ success: false, error: e.message }), {
             status: 500,
