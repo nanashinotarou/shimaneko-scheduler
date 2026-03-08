@@ -887,9 +887,6 @@
         </header>
 
         <section id="home-section">
-            <div id="priority-task-banner"
-                style="display: none; background: #FFF3E0; border-left: 4px solid #FF9800; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-weight: bold; color: #E65100; max-width: 1400px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            </div>
             <div class="card settings-container" style="padding: 16px; max-width: 1400px; margin-bottom: 16px;">
                 <!-- Mode Tabs -->
                 <div class="mode-tabs">
@@ -954,240 +951,229 @@
                 </div>
             </div>
 
-            <!-- Task Dashboard (Commander UI) -->
-            <div id="task-dashboard" class="task-dashboard">
-                <div class="task-panel">
-                    <h3 id="dashboard-title">🐈 Inbox</h3>
-                    <div id="unassigned-tasks" class="task-list">
-                        <div style="color:#888; font-size:0.9rem; text-align:center; padding:12px;">タスクを読み込んでいます...
-                        </div>
-                    </div>
-                </div>
-            </div>
+    </div>
 
-            <div id="calendar-view">
-                <!-- 曜日見出し -->
-                <div class="calendar-wrapper">
-                    <div class="calendar-grid" id="weekday-header-row">
-                        <div class="weekday-header sun">日</div>
-                        <div class="weekday-header">月</div>
-                        <div class="weekday-header">火</div>
-                        <div class="weekday-header">水</div>
-                        <div class="weekday-header">木</div>
-                        <div class="weekday-header">金</div>
-                        <div class="weekday-header sat">土</div>
-                    </div>
-                    <div id="calendar-container" class="calendar-grid"
-                        style="border-top: 1px solid var(--color-border);"></div>
-                </div>
+    <div id="calendar-view">
+        <!-- 曜日見出し -->
+        <div class="calendar-wrapper">
+            <div class="calendar-grid" id="weekday-header-row">
+                <div class="weekday-header sun">日</div>
+                <div class="weekday-header">月</div>
+                <div class="weekday-header">火</div>
+                <div class="weekday-header">水</div>
+                <div class="weekday-header">木</div>
+                <div class="weekday-header">金</div>
+                <div class="weekday-header sat">土</div>
             </div>
+            <div id="calendar-container" class="calendar-grid" style="border-top: 1px solid var(--color-border);"></div>
+        </div>
+    </div>
 
-            <!-- Shift Legend -->
-            <div id="shift-legend"
-                style="margin-top: 16px; font-size: 0.8rem; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                <div><span
-                        style="display:inline-block; width:12px; height:12px; background:#FFFDE7; border: 2px solid #FFD54F;"></span>
-                    稼働おすすめ日</div>
-                <div><span
-                        style="display:inline-block; width:12px; height:12px; background:#F3E5F5; border: 2px solid #E1BEE7;"></span>
-                    3人共通予定あり</div>
-                <div><span style="display:inline-block; width:12px; height:12px; background:#f5f5f5;"></span> しまねこ休業日
-                </div>
-            </div>
+    <!-- Shift Legend -->
+    <div id="shift-legend"
+        style="margin-top: 16px; font-size: 0.8rem; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+        <div><span
+                style="display:inline-block; width:12px; height:12px; background:#FFFDE7; border: 2px solid #FFD54F;"></span>
+            稼働おすすめ日</div>
+        <div><span
+                style="display:inline-block; width:12px; height:12px; background:#F3E5F5; border: 2px solid #E1BEE7;"></span>
+            3人共通予定あり</div>
+        <div><span style="display:inline-block; width:12px; height:12px; background:#f5f5f5;"></span> しまねこ休業日
+        </div>
+    </div>
 
-            <!-- SNS Legend -->
-            <div id="sns-legend" class="sns-legend" style="display: none;">
-                <div class="sns-legend-item"><span
-                        style="display:inline-block; width:12px; height:12px; background:linear-gradient(135deg, #fce4ec, #f3e5f5); border-left: 3px solid #E1306C;"></span>
-                    Instagram</div>
-                <div class="sns-legend-item"><span
-                        style="display:inline-block; width:12px; height:12px; background:#FFEBEE; border-left: 3px solid #FF0000;"></span>
-                    YouTube</div>
-                <div class="sns-legend-item">📝 予定</div>
-                <div class="sns-legend-item">✅ 投稿済み</div>
-                <div class="sns-legend-item" style="color:#888;">🔴ササミ 🔵ツナ 🟡コンブ 🟢全体</div>
-            </div>
-        </section>
+    <!-- SNS Legend -->
+    <div id="sns-legend" class="sns-legend" style="display: none;">
+        <div class="sns-legend-item"><span
+                style="display:inline-block; width:12px; height:12px; background:linear-gradient(135deg, #fce4ec, #f3e5f5); border-left: 3px solid #E1306C;"></span>
+            Instagram</div>
+        <div class="sns-legend-item"><span
+                style="display:inline-block; width:12px; height:12px; background:#FFEBEE; border-left: 3px solid #FF0000;"></span>
+            YouTube</div>
+        <div class="sns-legend-item">📝 予定</div>
+        <div class="sns-legend-item">✅ 投稿済み</div>
+        <div class="sns-legend-item" style="color:#888;">🔴ササミ 🔵ツナ 🟡コンブ 🟢全体</div>
+    </div>
+    </section>
 
-        <!-- Settings Section -->
-        <section id="settings-section" class="card hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h2>メンバー設定</h2>
-                <button class="btn btn-sm btn-secondary" onclick="saveSettings()">保存して閉じる</button>
-            </div>
+    <!-- Settings Section -->
+    <section id="settings-section" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2>メンバー設定</h2>
+            <button class="btn btn-sm btn-secondary" onclick="saveSettings()">保存して閉じる</button>
+        </div>
 
-            <div class="card" style="background-color: #E8F5E9; border-color: #A5D6A7; margin-bottom: 24px;">
-                <h3 style="color: #2E7D32; margin-bottom: 8px;">☁️ ローカルデータをクラウドへ同期</h3>
-                <p style="font-size: 0.85rem; margin-bottom: 12px; color: #388E3C;">
-                    このブラウザ（PCやスマホ）に保存されている既存のスケジュールデータを、クラウドのデータベース（スプレッドシート）へ一括で送信し、他のメンバーと共有できるようにします。<br>※既に同期済みのデータは重複しません。
-                </p>
-                <button class="btn" onclick="syncLocalToCloud()"
-                    style="background-color: #4CAF50; color: white; border: none;">⬆️ 今すぐクラウドへ同期する</button>
-            </div>
-
-            <div class="card" style="background-color: #FFF3E0; border-color: #FFCC80; margin-bottom: 24px;">
-                <h3 style="color: #E65100; margin-bottom: 8px;">🌸 期間限定：3月のシフト一括登録</h3>
-                <p style="font-size: 0.85rem; margin-bottom: 12px; color: #E65100;">
-                    ツナ（カニ屋）とササミ（カニ屋＆リンクモア）の3月分のスケジュールをワンクリックで追加します。<br>既存のデータは保持されたまま追加されます。</p>
-                <button class="btn" onclick="injectMarchData()"
-                    style="background-color: #FF9800; color: white; border: none;">✅ 3月分を反映する</button>
-            </div>
-
-            <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px dashed var(--color-border);">
-                <div class="member-header">
-                    <span>🤖 Gemini API キー</span>
-                </div>
-                <label style="font-size:0.8rem;">画像の高精度解析に使用します（ローカルのみ保存・外部送信なし）</label>
-                <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (APIキーを入力)">
-                <p style="font-size:0.75rem; color:#888; margin-top:4px;">Google AI Studioで取得したAPIキーを設定してください。</p>
-            </div>
-
-            <p style="font-size:0.9rem; margin-bottom:16px;">
-                シフト表に書かれている名前（キーワード）を設定してください。<br>
-                ※カンマ区切りで複数指定できます。
+        <div class="card" style="background-color: #E8F5E9; border-color: #A5D6A7; margin-bottom: 24px;">
+            <h3 style="color: #2E7D32; margin-bottom: 8px;">☁️ ローカルデータをクラウドへ同期</h3>
+            <p style="font-size: 0.85rem; margin-bottom: 12px; color: #388E3C;">
+                このブラウザ（PCやスマホ）に保存されている既存のスケジュールデータを、クラウドのデータベース（スプレッドシート）へ一括で送信し、他のメンバーと共有できるようにします。<br>※既に同期済みのデータは重複しません。
             </p>
+            <button class="btn" onclick="syncLocalToCloud()"
+                style="background-color: #4CAF50; color: white; border: none;">⬆️ 今すぐクラウドへ同期する</button>
+        </div>
 
-            <div id="settings-list"></div>
-        </section>
+        <div class="card" style="background-color: #FFF3E0; border-color: #FFCC80; margin-bottom: 24px;">
+            <h3 style="color: #E65100; margin-bottom: 8px;">🌸 期間限定：3月のシフト一括登録</h3>
+            <p style="font-size: 0.85rem; margin-bottom: 12px; color: #E65100;">
+                ツナ（カニ屋）とササミ（カニ屋＆リンクモア）の3月分のスケジュールをワンクリックで追加します。<br>既存のデータは保持されたまま追加されます。</p>
+            <button class="btn" onclick="injectMarchData()"
+                style="background-color: #FF9800; color: white; border: none;">✅ 3月分を反映する</button>
+        </div>
 
-        <!-- Import Section -->
-        <section id="import-section" class="card hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h2>インポート</h2>
-                <button class="btn btn-sm btn-secondary" onclick="showHome()">閉じる</button>
+        <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px dashed var(--color-border);">
+            <div class="member-header">
+                <span>🤖 Gemini API キー</span>
             </div>
+            <label style="font-size:0.8rem;">画像の高精度解析に使用します（ローカルのみ保存・外部送信なし）</label>
+            <input type="password" id="setting-gemini-key" placeholder="AIzaSy... (APIキーを入力)">
+            <p style="font-size:0.75rem; color:#888; margin-top:4px;">Google AI Studioで取得したAPIキーを設定してください。</p>
+        </div>
 
-            <div class="drop-zone" id="drop-zone">
-                <p>📷 画像をここにドロップ<br>(またはクリックして選択)<br><span
-                        style="font-size: 0.8rem; color: #aaa;">OCRでテキストを読み取ります</span></p>
-                <input type="file" id="file-input" accept="image/*" style="display: none;">
-            </div>
+        <p style="font-size:0.9rem; margin-bottom:16px;">
+            シフト表に書かれている名前（キーワード）を設定してください。<br>
+            ※カンマ区切りで複数指定できます。
+        </p>
 
-            <p style="margin-bottom: 8px; font-size: 0.9rem;">テキスト (シフト表 または Notionタスク)</p>
-            <textarea id="raw-text-input" placeholder="例: 2/20 田中 10-19&#10;例: 2/25 LPデザイン提出"></textarea>
-            <button id="btn-analyze" class="btn">解析してプレビュー</button>
+        <div id="settings-list"></div>
+    </section>
 
-            <!-- Manual shift addition -->
-            <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
-                <p style="font-weight:bold; margin-bottom:8px; color:#555;">✍️ 予定を手動で追加</p>
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <input type="date" id="manual-date" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
-                    <select id="manual-member" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
-                        <option value="ササミ">ササミ</option>
-                        <option value="ツナ">ツナ</option>
-                        <option value="コンブ">コンブ</option>
-                        <option value="全員/〆">全員/〆</option>
-                    </select>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="manual-content" placeholder="内容 (例: 休み, 午後休, 10-18...)"
-                        style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
-                    <button class="btn btn-sm" onclick="addManualShift()"
-                        style="white-space:nowrap; background-color:#FF9800; color:white; border:none;">追加</button>
-                </div>
-            </div>
+    <!-- Import Section -->
+    <section id="import-section" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2>インポート</h2>
+            <button class="btn btn-sm btn-secondary" onclick="showHome()">閉じる</button>
+        </div>
 
-            <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
-                <p style="font-weight:bold; margin-bottom:8px; color:#555; display:flex; align-items:center;">
-                    <span class="material-icons-round" style="margin-right:4px;">date_range</span> 休み・希望休をまとめて追加
-                </p>
-                <p style="font-size: 0.8rem; color: #666; margin-bottom: 12px; line-height: 1.4;">
-                    カレンダーから複数日を選んで、自分やチームの休み希望などを一括登録できます。</p>
-                <button class="btn btn-secondary" onclick="window.startBotInteraction(true)"
-                    style="width: 100%;">カレンダーを開く</button>
-            </div>
-        </section>
-
-        <!-- Preview Section -->
-        <section id="preview-section" class="card hidden">
-            <h2>解析結果の確認</h2>
-            <p style="margin-bottom: 16px; font-size: 0.9rem;">
-                読み取りミスがあれば日付や内容を修正してください。
+        <div class="drop-zone" id="drop-zone">
+            <p>📷 画像をここにドロップ<br>(またはクリックして選択)<br><span style="font-size: 0.8rem; color: #aaa;">OCRでテキストを読み取ります</span>
             </p>
+            <input type="file" id="file-input" accept="image/*" style="display: none;">
+        </div>
 
-            <div id="preview-list" class="preview-list"></div>
+        <p style="margin-bottom: 8px; font-size: 0.9rem;">テキスト (シフト表 または Notionタスク)</p>
+        <textarea id="raw-text-input" placeholder="例: 2/20 田中 10-19&#10;例: 2/25 LPデザイン提出"></textarea>
+        <button id="btn-analyze" class="btn">解析してプレビュー</button>
 
-            <div style="margin-top: 24px; display: flex; gap: 12px;">
-                <button id="btn-cancel" class="btn btn-secondary" onclick="toggleSection('import')">やり直し</button>
-                <button id="btn-save" class="btn" onclick="startBotInteraction()">これでOK (次へ)</button>
+        <!-- Manual shift addition -->
+        <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
+            <p style="font-weight:bold; margin-bottom:8px; color:#555;">✍️ 予定を手動で追加</p>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <input type="date" id="manual-date" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                <select id="manual-member" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <option value="ササミ">ササミ</option>
+                    <option value="ツナ">ツナ</option>
+                    <option value="コンブ">コンブ</option>
+                    <option value="全員/〆">全員/〆</option>
+                </select>
             </div>
-        </section>
-
-        <!-- Bot Interaction Modal -->
-        <div id="bot-modal" class="bot-modal">
-            <div class="bot-header">
-                <div class="bot-avatar">🐈‍⬛</div>
-                <div class="bot-bubble" id="bot-message">
-                    OK！シフトは見込めたよ。<br>じゃあ最後に、今月「しまねこデザイン」を終日お休み(オフ)にしたい日があれば教えてね！チームのスケジュールの参考にするよ。
-                </div>
-            </div>
-            <div class="bot-content">
-                <div style="margin-bottom: 12px; text-align: center;">
-                    <label style="font-size:0.85rem; font-weight:bold;">誰の希望？</label>
-                    <select id="bot-requester-select"
-                        style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-family:inherit;">
-                        <option value="ササミ">ササミ</option>
-                        <option value="ツナ">ツナ</option>
-                        <option value="コンブ">コンブ</option>
-                        <option value="自分たち">自分たち（全員）</option>
-                    </select>
-                </div>
-                <p style="font-size:0.8rem; color:#666; text-align:center;">（休業日としてマークしたい日を全てタップしてください）</p>
-                <div id="bot-calendar-select" class="bot-date-grid">
-                    <!-- Date buttons generated by JS -->
-                </div>
-            </div>
-            <div class="bot-actions">
-                <button class="btn btn-secondary" onclick="finishBotInteraction(false)">休業日なしで完了</button>
-                <button class="btn" onclick="finishBotInteraction(true)"
-                    style="background:var(--col-kombu); color:var(--color-text);">決定して完了</button>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="manual-content" placeholder="内容 (例: 休み, 午後休, 10-18...)"
+                    style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                <button class="btn btn-sm" onclick="addManualShift()"
+                    style="white-space:nowrap; background-color:#FF9800; color:white; border:none;">追加</button>
             </div>
         </div>
 
-        <!-- Edit Modal -->
-        <div id="edit-modal-overlay" class="edit-modal-overlay" onclick="closeEditModal(event)">
-            <div class="edit-modal" onclick="event.stopPropagation()">
-                <h3>✏️ 予定を編集</h3>
-                <div class="form-group">
-                    <label>📅 日付</label>
-                    <input type="date" id="edit-date">
-                </div>
-                <div class="form-group">
-                    <label>👤 メンバー</label>
-                    <select id="edit-member">
-                        <option value="ササミ">ササミ</option>
-                        <option value="ツナ">ツナ</option>
-                        <option value="コンブ">コンブ</option>
-                        <option value="全員/〆">全員/〆</option>
-                        <option value="自分たち">自分たち（休業日）</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>📝 内容</label>
-                    <input type="text" id="edit-content" placeholder="例: 10-18, 休み, 展示14時～...">
-                </div>
-                <div class="form-group" id="edit-task-status-group"
-                    style="display: none; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="edit-task-done"
-                        style="width: 18px; height: 18px; accent-color: var(--col-task);">
-                    <label for="edit-task-done" style="margin-bottom: 0; font-size: 0.95rem; cursor: pointer;">✅
-                        完了済みとしてマーク</label>
-                </div>
-                <div class="edit-modal-actions">
-                    <button class="btn btn-danger btn-sm" onclick="deleteFromEditModal()" style="flex:0.6;">🗑
-                        削除</button>
-                    <button class="btn btn-secondary btn-sm" onclick="closeEditModal()">キャンセル</button>
-                    <button class="btn btn-sm" onclick="saveEditModal()"
-                        style="background:var(--col-kombu); color:var(--color-text);">💾 保存</button>
-                </div>
+        <div style="margin-top:24px; padding-top:16px; border-top: 1px dashed #ccc;">
+            <p style="font-weight:bold; margin-bottom:8px; color:#555; display:flex; align-items:center;">
+                <span class="material-icons-round" style="margin-right:4px;">date_range</span> 休み・希望休をまとめて追加
+            </p>
+            <p style="font-size: 0.8rem; color: #666; margin-bottom: 12px; line-height: 1.4;">
+                カレンダーから複数日を選んで、自分やチームの休み希望などを一括登録できます。</p>
+            <button class="btn btn-secondary" onclick="window.startBotInteraction(true)"
+                style="width: 100%;">カレンダーを開く</button>
+        </div>
+    </section>
+
+    <!-- Preview Section -->
+    <section id="preview-section" class="card hidden">
+        <h2>解析結果の確認</h2>
+        <p style="margin-bottom: 16px; font-size: 0.9rem;">
+            読み取りミスがあれば日付や内容を修正してください。
+        </p>
+
+        <div id="preview-list" class="preview-list"></div>
+
+        <div style="margin-top: 24px; display: flex; gap: 12px;">
+            <button id="btn-cancel" class="btn btn-secondary" onclick="toggleSection('import')">やり直し</button>
+            <button id="btn-save" class="btn" onclick="startBotInteraction()">これでOK (次へ)</button>
+        </div>
+    </section>
+
+    <!-- Bot Interaction Modal -->
+    <div id="bot-modal" class="bot-modal">
+        <div class="bot-header">
+            <div class="bot-avatar">🐈‍⬛</div>
+            <div class="bot-bubble" id="bot-message">
+                OK！シフトは見込めたよ。<br>じゃあ最後に、今月「しまねこデザイン」を終日お休み(オフ)にしたい日があれば教えてね！チームのスケジュールの参考にするよ。
             </div>
         </div>
-
-        <!-- Loading Overlay -->
-        <div id="loading-overlay" class="loading-overlay hidden">
-            <div style="font-size: 2rem;">🐈</div>
-            <p id="loading-text" style="font-weight: bold; margin-top: 16px;">読み込み中...</p>
+        <div class="bot-content">
+            <div style="margin-bottom: 12px; text-align: center;">
+                <label style="font-size:0.85rem; font-weight:bold;">誰の希望？</label>
+                <select id="bot-requester-select"
+                    style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-family:inherit;">
+                    <option value="ササミ">ササミ</option>
+                    <option value="ツナ">ツナ</option>
+                    <option value="コンブ">コンブ</option>
+                    <option value="自分たち">自分たち（全員）</option>
+                </select>
+            </div>
+            <p style="font-size:0.8rem; color:#666; text-align:center;">（休業日としてマークしたい日を全てタップしてください）</p>
+            <div id="bot-calendar-select" class="bot-date-grid">
+                <!-- Date buttons generated by JS -->
+            </div>
         </div>
+        <div class="bot-actions">
+            <button class="btn btn-secondary" onclick="finishBotInteraction(false)">休業日なしで完了</button>
+            <button class="btn" onclick="finishBotInteraction(true)"
+                style="background:var(--col-kombu); color:var(--color-text);">決定して完了</button>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal-overlay" class="edit-modal-overlay" onclick="closeEditModal(event)">
+        <div class="edit-modal" onclick="event.stopPropagation()">
+            <h3>✏️ 予定を編集</h3>
+            <div class="form-group">
+                <label>📅 日付</label>
+                <input type="date" id="edit-date">
+            </div>
+            <div class="form-group">
+                <label>👤 メンバー</label>
+                <select id="edit-member">
+                    <option value="ササミ">ササミ</option>
+                    <option value="ツナ">ツナ</option>
+                    <option value="コンブ">コンブ</option>
+                    <option value="全員/〆">全員/〆</option>
+                    <option value="自分たち">自分たち（休業日）</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>📝 内容</label>
+                <input type="text" id="edit-content" placeholder="例: 10-18, 休み, 展示14時～...">
+            </div>
+            <div class="form-group" id="edit-task-status-group" style="display: none; align-items: center; gap: 8px;">
+                <input type="checkbox" id="edit-task-done"
+                    style="width: 18px; height: 18px; accent-color: var(--col-task);">
+                <label for="edit-task-done" style="margin-bottom: 0; font-size: 0.95rem; cursor: pointer;">✅
+                    完了済みとしてマーク</label>
+            </div>
+            <div class="edit-modal-actions">
+                <button class="btn btn-danger btn-sm" onclick="deleteFromEditModal()" style="flex:0.6;">🗑
+                    削除</button>
+                <button class="btn btn-secondary btn-sm" onclick="closeEditModal()">キャンセル</button>
+                <button class="btn btn-sm" onclick="saveEditModal()"
+                    style="background:var(--col-kombu); color:var(--color-text);">💾 保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div style="font-size: 2rem;">🐈</div>
+        <p id="loading-text" style="font-weight: bold; margin-top: 16px;">読み込み中...</p>
+    </div>
 
     </div>
 
@@ -1269,146 +1255,19 @@
             }
         }
 
-        let tasksData = [];
         const urlParams = new URLSearchParams(window.location.search);
         const currentUser = urlParams.get('user');
 
         if (currentUser) {
             document.body.classList.add('user-' + currentUser);
-            if (currentUser === 'sasami') {
-                document.getElementById('dashboard-title').innerHTML = '👑 Commander Hub (ササミ専用)';
-            } else if (currentUser === 'kombu') {
-                document.getElementById('dashboard-title').innerHTML = '⚙️ My Inbox (コンブ専用)';
-            } else if (currentUser === 'tsuna') {
-                document.getElementById('dashboard-title').innerHTML = '🎨 Production Studio (ツナ専用)';
-            }
         }
 
         loadConfig();
         (async () => {
             await loadHolidays();
             await loadData();
-            await loadTasksData(); // Fetch Notion tasks via proxy
             renderCalendar();
         })();
-
-        async function loadTasksData() {
-            try {
-                const response = await fetch('/api/tasks');
-                if (response.ok) {
-                    tasksData = await response.json();
-                }
-            } catch (e) {
-                console.error('Task load error', e);
-            }
-            renderTaskDashboard();
-        }
-
-        function renderTaskDashboard() {
-            const container = document.getElementById('unassigned-tasks');
-            const dashboardSection = document.getElementById('task-dashboard');
-            const banner = document.getElementById('priority-task-banner');
-
-            if (!container) return;
-            container.innerHTML = '';
-
-            let dashboardTasks = [];
-            if (currentUser === 'sasami') {
-                // Sasami sees ALL unassigned or not completed tasks
-                dashboardTasks = tasksData.filter(t => t.status !== '完了' && (t.assignee === '未定' || t.status === '確認待ち'));
-                if (banner) banner.style.display = 'none';
-            } else if (currentUser === 'kombu') {
-                // Kombu sees tasks assigned to Kombu
-                dashboardTasks = tasksData.filter(t => t.assignee === 'コンブ' && t.status !== '完了');
-            } else if (currentUser === 'tsuna') {
-                // Tsuna sees tasks assigned to Tsuna
-                dashboardTasks = tasksData.filter(t => t.assignee === 'ツナ' && t.status !== '完了');
-            }
-
-            if (!currentUser) {
-                if (dashboardSection) dashboardSection.style.display = 'none';
-                if (banner) banner.style.display = 'none';
-                return;
-            }
-
-            // ツナとコンブの場合は Commander Hub 本体を隠し、メッセージバナーだけを出す
-            if (currentUser !== 'sasami') {
-                if (dashboardSection) dashboardSection.style.display = 'none';
-                if (banner) {
-                    if (dashboardTasks.length > 0) {
-                        let taskListHTML = dashboardTasks.map(t => {
-                            const statusColor = t.status === '制作中' ? '#FFC107' : t.status === '確認待ち' ? '#9C27B0' : '#E0E0E0';
-                            return `
-                                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7); padding:8px 12px; margin-top:8px; border-radius:4px;">
-                                    <div style="font-weight:normal; color:#333; font-size: 0.95rem;">・${t.name} <span class="task-badge" style="background:${statusColor}; color:${t.status === '未着手' ? '#666' : 'white'}; font-size:0.8em; margin-left:8px;">${t.status}</span></div>
-                                    <button class="btn btn-sm" style="background:#4CAF50; color:white; border:none; padding:6px 12px;" onclick="completeTask('${t.id}', '${t.name}')">完了にする</button>
-                                </div>`;
-                        }).join('');
-
-                        banner.innerHTML = `🔔 あなたの優先タスクが ${dashboardTasks.length} 件あります！${taskListHTML}`;
-                        banner.style.display = 'block';
-                    } else {
-                        banner.style.display = 'none';
-                    }
-                }
-                return;
-            }
-
-            // ササミの場合は通常通り Commander Hub を表示
-            if (dashboardSection) dashboardSection.style.display = 'block';
-
-            if (dashboardTasks.length === 0) {
-                container.innerHTML = '<div style="color:#888; font-size:0.9rem; text-align:center; padding:12px;">現在のタスクはありません（またはURLパラメータ ?user= が指定されていません）</div>';
-                if (!currentUser) document.getElementById('task-dashboard').style.display = 'none';
-                return;
-            }
-
-            dashboardTasks.forEach(task => {
-                const item = document.createElement('div');
-                item.className = 'task-item';
-
-                const emoji = task.type === 'デザイン制作' ? '🎨' : task.type === 'システム開発' ? '💻' : task.type === 'SNS運用' ? '📱' : '📝';
-                const statusColor = task.status === '制作中' ? '#FFC107' : task.status === '確認待ち' ? '#9C27B0' : '#E0E0E0';
-
-                item.innerHTML = `
-                    <div>
-                        <div class="task-title">${emoji} ${task.name}</div>
-                        <div class="task-meta">
-                            <span class="task-badge" style="background:${statusColor}; color:${task.status === '未着手' ? '#666' : 'white'}">${task.status}</span>
-                            <span class="task-badge">${task.assignee}</span>
-                            <span class="task-badge" style="color:#d32f2f;">${task.clientStatus !== 'なし' ? '交渉:' + task.clientStatus : ''}</span>
-                        </div>
-                    </div>
-                    ${currentUser === 'sasami' && task.assignee === '未定' ? `<button class="btn btn-sm" onclick="assignTaskPrompt('${task.id}', '${task.name}')">卸す</button>` : ''}
-                    ${currentUser !== 'sasami' && task.status !== '完了' ? `<button class="btn btn-sm" style="background:#4CAF50;" onclick="completeTask('${task.id}', '${task.name}')">完了</button>` : ''}
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        async function assignTaskPrompt(id, name) {
-            const assignee = prompt(`「${name}」を誰に卸しますか？\\n(コンブ / ツナ)`);
-            if (assignee !== 'コンブ' && assignee !== 'ツナ') return;
-            const dateStr = prompt(`着手予定日をYYYY-MM-DD形式で入力してください\\n（例: 2026-03-10）`);
-            if (!dateStr) return;
-
-            try {
-                elLoading.classList.remove('hidden');
-                elLoadingText.innerText = 'Notionを更新中...';
-                await fetch('/api/tasks', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, updates: { assignee, date: dateStr, status: '制作中' } })
-                });
-                await loadTasksData();
-                renderCalendar();
-            } catch (e) {
-                alert('エラー: ' + e.message);
-            } finally {
-                elLoading.classList.add('hidden');
-            }
-        }
-
         async function completeTask(id, name) {
             if (!confirm(`「${name}」を完了（または確認待ち）にしますか？`)) return;
             try {
